@@ -856,6 +856,6 @@ else {
 }
 ?>
 </main>
-<footer><a href="https://framagit.org/justinmponcet/pressdb">Code source</a></footer>
+<footer><a href="https://framagit.org/justinmponcet/pressdb">Code source</a> - Version alpha</footer>
 </body>
 </html>
