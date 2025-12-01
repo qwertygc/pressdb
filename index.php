@@ -129,7 +129,7 @@ function tags($array) {
 	 $query = $db->query('SELECT DISTINCT trim(category) as category FROM presse '.$filter_cat.' ORDER BY category');
 	 $data = $query->fetchAll(PDO::FETCH_COLUMN);
 	foreach(tags($data) as $cat) {
-		$tags .= '<li><a class="dropdown-item" href="?do=add&id='.$array['id'].'&category='.$cat.'&token='.$_SESSION['token'].'" target="_blank">'.$cat.'</a></li>';
+		$tags .= '<li><a class="dropdown-item" href="?do=add&id='.$array['id'].'&category='.$cat.'&token='.$_SESSION['token'].'&idp='.$_GET['idp'].'">'.$cat.'</a></li>';
 	 }
 	 /*
 	 while($data = $query->fetch()) {
@@ -142,13 +142,13 @@ function tags($array) {
 		    <aside>
 		    <div class="d-print-none">
 				<a href="?do=add&id='.$array['id'].'" class="btn btn-primary" target="_blank"><i class="fa fa-pencil" aria-hidden="true"></i> Éditer</a>
-				<a href="?do=add&delete='.$array['id'].'&token='.$_SESSION['token'].'" class="btn btn-danger"  onclick="return confirm(\'Êtes-vous sûr ?\');" target="_blank"><i class="fa fa-trash" aria-hidden="true"></i> Supprimer</a>
+				<a href="?do=add&delete='.$array['id'].'&token='.$_SESSION['token'].'&idp='.$_GET['idp'].'" class="btn btn-danger"  onclick="return confirm(\'Êtes-vous sûr ?\');" target="_blank"><i class="fa fa-trash" aria-hidden="true"></i> Supprimer</a>
 			'.$tags.'
 		    <p><i class="fa fa-calendar" aria-hidden="true"></i> <time>'.$array['date'].'</time> ⋅ <i class="fa fa-newspaper-o" aria-hidden="true"></i> '.$array['journal'].' ⋅ <i class="fa fa-tags" aria-hidden="true"></i> '.$array['category'].' ⋅ <i class="fa fa-link" aria-hidden="true"></i> '.beautiful_url($array['source']).' ⋅ '.str_word_count((string)$array['content'],0).' mots</p>
 		    </aside>
 		    </header>
 		    <main>
-		    '.nl2br($array['content']).'
+		    '.nl2br((string)$array['content']).'
 		    </main>
 		</article>';
 }
@@ -307,7 +307,15 @@ if(isset($_GET['do'])) {
         		$something = sql('SELECT * FROM presse WHERE id=?', array(intval($_GET['article'])));
                 $something->setFetchMode(PDO::FETCH_BOTH);
                 $data = $something->fetch();
+                $_GET['idp'] = $data['id_collection'];
                 echo show_article($data);
+        	}
+        	elseif(isset($_GET['sort'])) {
+        			$something = sql('SELECT * FROM presse WHERE id_collection=? AND category="à_trier" ORDER BY id DESC LIMIT 1', array(intval($_GET['sort'])));
+			        $something->setFetchMode(PDO::FETCH_BOTH);
+			        $data = $something->fetch();
+			        $_GET['idp'] = $_GET['sort'];
+			        echo show_article($data);
         	}
         	else {
         		$filter_cat = (isset($_GET['idp'])) ? ' WHERE id_collection='.$_GET['idp']: '';
@@ -316,10 +324,10 @@ if(isset($_GET['do'])) {
 		        echo'<form method="post" class="d-print-none">
 		            <label>Collection</label>
 		            <select class="form-select" name="collection">';
-		                $id_collection = (isset($_GET['idp'])) ? $_GET['idp'] : 0;
+		                //$id_collection = (isset($_GET['idp'])) ? $_GET['idp'] : 0;
 		                $query = $db->query('SELECT * FROM collections ORDER BY id');
 		                while($data = $query->fetch()) {
-				            $selected = ((int)$data['id'] == (int)$id_collection) ? 'selected' : '';
+				            $selected = ((int)$data['id'] == (int)$_GET['idp']) ? 'selected' : '';
 				          	echo '<option value="'.$data['id'].'" '.$selected.'>'.$data['name'].'</option>';
 						}
 		            echo '</select>
@@ -348,6 +356,7 @@ if(isset($_GET['do'])) {
 		            <label>Mot-clé</label> <input type="search" name="search" class="form-control"/>
 		            <input type="submit" name="submit" value="Exécuter" class="btn btn-primary mb-3"/>
 		            <input type="submit" name="submit_file" value="Exporter" class="btn btn-primary mb-3"/>
+					<a href="?do=view&sort='.$_GET['idp'].'" class="btn btn-primary mb-3">Trier</a>
 		            </form>';
 		    if(isset($_POST['submit']) OR isset($_GET['htmlview']) OR isset($_POST['submit_file'])) {
 		    	if(isset($_GET['htmlview'])) {
@@ -526,12 +535,13 @@ if(isset($_GET['do'])) {
         if(!check(@$_SESSION['login']) AND $_SERVER['SERVER_NAME'] !='localhost') {header('Location: index.php?do=login');}
         	if(isset($_GET['delete']) AND isset($_GET['token']) AND $_GET['token'] == $_SESSION['token'] AND $_GET['token'] !='') {
 				sql('DELETE FROM presse WHERE id=?', array($_GET['delete']));
-				redirect('index.php');
+				//redirect('index.php?do=view&idp='.$_GET['idp'].'');
+				echo '<script>window.close();</script>';
 				
 			}
 			if(isset($_GET['id']) AND isset($_GET['category'])) {
 				sql('UPDATE presse SET category = ? WHERE id=?', array($category.' '.$_GET['category'], $_GET['id']));
-				redirect('index.php?do=view&article='.$_GET['id']);
+				redirect('index.php?do=view&sort='.$_GET['idp']);
 			}
 	        if (isset($_GET['id'])) {
 	            $something = sql('SELECT * FROM presse WHERE id=?', array(intval($_GET['id'])));
@@ -600,7 +610,7 @@ if(isset($_GET['do'])) {
 	   echo '<form method="post" action="?do=add" class="d-print-none">
 	        <label>Collection</label>
 	        <select class="form-select" name="collection">';
-	            $id_collection = (isset($_GET['idp'])) ? $_GET['idp'] : 0;
+	            //$id_collection = (isset($_GET['idp'])) ? $_GET['idp'] : 0;
 	            $query = $db->query('SELECT * FROM collections ORDER BY id');
 	            while($data = $query->fetch()) {
 			        $selected = ((int)$data['id'] == (int)$id_collection) ? 'selected' : '';
