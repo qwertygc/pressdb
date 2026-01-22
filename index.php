@@ -99,9 +99,13 @@ if(isset($_GET['do'])) {
             while($data = $query->fetch()) {
                 echo '<tr><td><a href="?do=view&idp='.$data['id'].'">'.$data['name'].'</a></td>
                     <td>
-                        <a href="?do=view&idp='.$data['id'].'" class="btn btn-primary"><i class="fa fa-eye" aria-hidden="true"></i></a>
-                        <a href="?do=add&idp='.$data['id'].'" class="btn btn-primary"><i class="fa fa-pencil" aria-hidden="true"></i></a>
-                        <a href="?do=collections&delete='.$data['id'].'&token='.$_SESSION['token'].'" class="btn btn-danger" onclick="return confirm(\'Êtes-vous sûr ?\');"><i class="fa fa-trash" aria-hidden="true"></i></a>
+                    <div class="btn-group" role="group" aria-label="Basic example">
+                        <a href="?do=view&idp='.$data['id'].'" class="btn btn-primary btn-sm"><i class="fa fa-eye" aria-hidden="true"></i> Voir</a>
+                        <a href="?do=view&sort='.$data['id'].'" class="btn btn-primary btn-sm"><i class="fa fa-sort"></i> Trier</a>
+                        <a href="?do=add&idp='.$data['id'].'" class="btn btn-primary btn-sm"><i class="fa fa-pencil" aria-hidden="true"></i> Ajouter un article</a>
+                        <a href="?do=tools&idp='.$data['id'].'" class="btn btn-primary btn-sm"><i class="fa fa-wrench" aria-hidden="true"></i> Configurer</a>
+                        <a href="?do=collections&delete='.$data['id'].'&token='.$_SESSION['token'].'" class="btn btn-danger btn-sm" onclick="return confirm(\'Êtes-vous sûr ?\');"><i class="fa fa-trash" aria-hidden="true"></i> Supprimer</a>
+                    </div>
                     </td>
                 </tr>';
             }
@@ -168,7 +172,7 @@ if(isset($_GET['do'])) {
 		            <input type="hidden" name="idp" value="'.$_GET['idp'].'"/>
 		            <input type="submit" name="submit" value="Exécuter" class="btn btn-primary mb-3"/>
 		            <input type="submit" name="submit_file" value="Exporter" class="btn btn-primary mb-3"/>
-					<a href="?do=view&sort='.$_GET['idp'].'" class="btn btn-primary mb-3">Trier</a>
+					<a href="?do=view&sort='.$_GET['idp'].'" class="btn btn-primary mb-3"><i class="fa fa-sort"></i> Trier</a>
 		            </form>';
 		    if(isset($_GET['submit']) OR isset($_GET['htmlview']) OR isset($_GET['submit_file'])) {
 		    	if(isset($_GET['htmlview'])) {
@@ -446,12 +450,14 @@ if(isset($_GET['do'])) {
 	            </form>';
         break;
         case 'tools':
+        	$idp = (isset($_GET['idp'])) ? ' WHERE id_collection='.$_GET['idp']: '';
+        	$idp_col = (isset($_GET['idp'])) ? ' WHERE id='.$_GET['idp']: '';
         	echo '<h1>Renommer les journaux</h1>
         	<form method="post" action="?do=tools" class="d-print-none">
 	        <label for="journal">Journaux</label>
 	        <select class="form-select" multiple aria-label="multiple select" name="journal[]" style="height:50em">';
 		                    $journal = (isset($_POST['journal'])) ? $_POST['journal'] : array();
-		                    $query = $db->query('SELECT DISTINCT trim(journal) as journal FROM presse ORDER BY journal');
+		                    $query = $db->query('SELECT DISTINCT trim(journal) as journal FROM presse '.$idp.' ORDER BY journal');
 		                    while($data = $query->fetch()) {
 				               	$selected = (in_array($data['journal'], $journal)) ? 'selected' : '';
 				          		echo '<option value="'.$data['journal'].'" '.$selected.'>'.$data['journal'].'</option>';
@@ -474,7 +480,7 @@ if(isset($_GET['do'])) {
 	        <label for="category">Catégories</label>
 	        <select class="form-select" multiple aria-label="multiple select" name="category[]" style="height:50em">';
 		                    $category = (isset($_POST['category'])) ? $_POST['category'] : array();
-		                    $query = $db->query('SELECT DISTINCT trim(category) as category FROM presse ORDER BY category');
+		                    $query = $db->query('SELECT DISTINCT trim(category) as category FROM presse '.$idp.' ORDER BY category');
 				            $data = $query->fetchAll(PDO::FETCH_COLUMN);
 				            foreach(tags($data) as $cat) {
 				            	echo '<option value="'.$cat.'">'.$cat.'</option>';
@@ -492,10 +498,10 @@ if(isset($_GET['do'])) {
 				           sql("UPDATE presse SET category =REPLACE(category, :old, :new) WHERE category LIKE '%$category%'", array('old'=>$category, 'new'=>$_POST['newname_category']));
 				        }
 				    }
-				header('Location: index.php?do=tools');
+				redirect('index.php?do=tools');
 		     }
 		     echo '<h1>Doublons</h1>';
-		     $query_collection = $db->query('SELECT * FROM collections ORDER BY id');
+		     $query_collection = $db->query('SELECT * FROM collections '.$idp_col.'  ORDER BY id');
             while($collections = $query_collection->fetch()) {
 				 $query = $db->query('SELECT COUNT(*) AS nbr_doublon, title FROM  presse WHERE id_collection='.$collections['id'].' GROUP BY title HAVING COUNT(*) > 1');
 				 echo '<h2>'.$collections['name'].'</h2>';
@@ -507,7 +513,8 @@ if(isset($_GET['do'])) {
 		  		echo '<a href="?do=tools&delete_doublon=yes&id_collection='.$collections['id'].'" class="btn btn-danger"><i class="fa fa-trash" aria-hidden="true"></i> Supprimer les doublons</a>';
 		  	}
       		if(isset($_GET['delete_doublon'])) {
-      			sql('DELETE FROM presse WHERE id NOT IN  (SELECT MAX(id) FROM presse GROUP BY title) WHERE id_collection='.$_GET['id_collection'].';');
+      			sql('DELETE FROM presse WHERE id NOT IN  (SELECT MAX(id) FROM presse GROUP BY title) AND id_collection='.$_GET['id_collection'].';');
+      			redirect('index.php?do=tools');
       		}
         break;
         case 'import':

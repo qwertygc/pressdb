@@ -117,7 +117,16 @@ function tags($array) {
 	$export = array_unique($export);
 	return $export;
 }
-		            
+function badge($text) {
+	if($text=='à_trier') {
+		$color = 'text-bg-warning';
+		
+	}
+	else {
+		$color = 'text-bg-light';
+	}
+	return '<span class="badge '.$color.'"><i class="fa fa-tags" aria-hidden="true"></i> '.$text.'</span>';
+}            
  function show_article($array=array('id'=>'', 'date'=>'', 'journal'=>'', 'category'=>'', 'source'=>'', 'content'=>''), $details=false) {
  	global $db;
  	global $_GET;
@@ -145,7 +154,7 @@ function tags($array) {
 				<a href="?do=add&id='.$array['id'].'" class="btn btn-primary" target="_blank"><i class="fa fa-pencil" aria-hidden="true"></i> Éditer</a>
 				<a  href="api.php?do=delete-entry&delete='.$array['id'].'&token='.$_SESSION['token'].'&idp='.$_GET['idp'].'" class="btn btn-danger"  onclick="return confirm(\'Êtes-vous sûr ?\');" data-ajax="true"><i class="fa fa-trash" aria-hidden="true"></i> Supprimer</a>
 			'.$tags.'
-		    <p><i class="fa fa-calendar" aria-hidden="true"></i> <time>'.$array['date'].'</time> ⋅ <i class="fa fa-newspaper-o" aria-hidden="true"></i> '.$array['journal'].' ⋅ <i class="fa fa-tags" aria-hidden="true"></i> '.$array['category'].' ⋅ <i class="fa fa-link" aria-hidden="true"></i> '.beautiful_url($array['source']).' ⋅ '.str_word_count((string)$array['content'],0).' mots</p>
+		    <p><i class="fa fa-calendar" aria-hidden="true"></i> <time>'.$array['date'].'</time> ⋅ <i class="fa fa-newspaper-o" aria-hidden="true"></i> '.$array['journal'].' ⋅ '.badge($array['category']).' ⋅ <i class="fa fa-link" aria-hidden="true"></i> '.beautiful_url($array['source']).' ⋅ '.str_word_count((string)$array['content'],0).' mots</p>
 		    </aside>
 		    </header>
 		    <main>';
