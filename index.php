@@ -453,6 +453,7 @@ if(isset($_GET['do'])) {
         	$idp = (isset($_GET['idp'])) ? ' WHERE id_collection='.$_GET['idp']: '';
         	$idp_col = (isset($_GET['idp'])) ? ' WHERE id='.$_GET['idp']: '';
         	echo '<h1>Renommer les journaux</h1>
+        	<a href="api.php?do=fix-website" data-ajax="true" class="btn btn-primary">Harmoniser les sites web</a>
         	<form method="post" action="?do=tools" class="d-print-none">
 	        <label for="journal">Journaux</label>
 	        <select class="form-select" multiple aria-label="multiple select" name="journal[]" style="height:50em">';
@@ -475,6 +476,7 @@ if(isset($_GET['do'])) {
 				    }
 				header('Location: index.php?do=tools');
 		     }
+
 		     echo '<h1>Renommer les catégories</h1>
         	<form method="post" action="?do=tools" class="d-print-none">
 	        <label for="category">Catégories</label>

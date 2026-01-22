@@ -22,8 +22,18 @@ if(isset($_GET['do'])) {
 				$response = ['success' => true, 'message' => 'Article supprimé'];
 			}
 		break;
+		case 'fix-website':
+			sql("UPDATE presse SET journal = REPLACE(journal, 'www.', '');");
+			sql("UPDATE presse SET journal = REPLACE(journal, '.com', '');");
+			sql("UPDATE presse SET journal = REPLACE(journal, '.fr', '');");
+			sql("UPDATE presse SET journal = REPLACE(journal, '.eu', '');");
+			sql("UPDATE presse SET journal = REPLACE(journal, '.org', '');");
+			$response = ['success' => true, 'message' => 'Sites web harmonisés'];
+		break;
 	}
 }
 
 echo json_encode($response);
 exit;
+
+
