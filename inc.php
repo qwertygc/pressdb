@@ -2,7 +2,7 @@
 session_start();
 use voku\helper\HtmlDomParser;
 include 'vendor/autoload.php';
-error_reporting(-1);
+error_reporting(0);
 
 function sql($query='', $values=array()) {
     global $db;
