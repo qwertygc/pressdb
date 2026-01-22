@@ -1,200 +1,5 @@
 <?php
-session_start();
-use voku\helper\HtmlDomParser;
-include 'vendor/autoload.php';
-error_reporting(-1);
-function sql($query='', $values=array()) {
-    global $db;
-    $query = $db->prepare($query);
-    $query->execute($values);
-    return $query;
-}
-function redirect($url) {
-	@header('Location: '.$url);
-	echo '<meta http-equiv="refresh" content="0; url='.$url.'">';
-	die;
-}
-function exportcsv($entries, $filename) {
-   /* ob_end_clean();
-    header("Content-type: application/csv; charset=utf-8");
-    header("Content-Disposition: attachment; filename=$filename");
-    header("Pragma: no-cache");
-    header("Expires: 0");
-    ob_start(); */
-    $out = fopen($filename, 'w');
-   // $out = fopen('php://output', 'w');
-    foreach ($entries as $entry) {
-        fputcsv($out, $entry, ',', '"', '');
-    }
-   // fclose($out);
-    //die();
-}
-function exportiramuteq($entries, $filename) {
-	$iramuteq = '';
-	$header = array_shift($entries);
-	foreach($entries as $entry) {
-		$iramuteq .= '**** *date_'.$entry[0].' *year_'.$entry[1].' *month_'.$entry[2].' *journal_'.$entry[3].' *category_'.$entry[4].PHP_EOL.$entry[5].PHP_EOL.$entry[6].PHP_EOL.PHP_EOL;
-	}
-	file_put_contents($filename, $iramuteq);
-}
-function europresse2standardtime($str) {
-	$mois = array(
-	  'janvier' => 1,
-	  'f&#233;vrier' => 2,
-	  'mars' => 3,
-	  'avril' => 4,
-	  'mai' => 5,
-	  'juin' => 6,
-	  'juillet' => 7,
-	  'ao&#251;t' => 8,
-	  'septembre' => 9,
-	  'octobre' => 10,
-	  'novembre' => 11,
-	  'd&#233;cembre' => 12,
-	  ''=>0
-	  );
-	 preg_match('/(\d{1,2}) (\S+) (\d{4})/', $str, $matches, PREG_OFFSET_CAPTURE);
-	  return array (
-		'formated' => $matches[3][0].'-'.str_pad($mois[$matches[2][0]], 2, '0', STR_PAD_LEFT).'-'.str_pad($matches[1][0], 2, '0', STR_PAD_LEFT),
-		'plain' => $matches[0][0]
-		);
-}
-
-function quickchart($type, $labels=array('Q1', 'Q2', 'Q3', 'Q4'), $ds=array(array('label'=>'Dogs', 'data'=>array(1, 2, 3, 4)))) {
-    $quickchart = [
-        'type' => $type,
-        'data' => [
-            'labels' => $labels,
-            'datasets' => $ds
-        ]
-    ];
-    return '<img src="https://quickchart.io/chart?c='.urlencode(json_encode($quickchart)).'" alt="chart"/>';
-}
-function beautiful_url($url) {
-	if(filter_var($url, FILTER_VALIDATE_URL)) {
-		$parse = parse_url($url);
-		return '<a href="'.$url.'">'.$parse['host'].'</a>';
-	}
-	else {
-		return $url;
-	}
-}
-function check($var) {
-    if ((isset($var) || !empty($var)) and $var == true) {
-        return true;
-    } else {
-        return false;
-    }
-}
-function ZipDir($filename, $path) {
-	$rootPath = realpath($path);
-	$zip = new ZipArchive();
-	$zip->open($filename, ZipArchive::CREATE | ZipArchive::OVERWRITE);
-	$files = new RecursiveIteratorIterator(
-		new RecursiveDirectoryIterator($rootPath),
-		RecursiveIteratorIterator::LEAVES_ONLY
-	);
-
-	foreach ($files as $name => $file) {
-		if (!$file->isDir()) {
-			$filePath = $file->getRealPath();
-			$relativePath = substr($filePath, strlen($rootPath) + 1);
-			$zip->addFile($filePath, $relativePath);
-		}
-	}
-	$zip->close();
-}
-
-function tags($array) {
-	$export = array();
-	foreach($array as $categories) {
-		$category = explode(" ", $categories);
-		foreach($category as $cat) {
-			$export[] = $cat;
-		}
-	}
-	$export = array_unique($export);
-	return $export;
-}
-		            
- function show_article($array=array('id'=>'', 'date'=>'', 'journal'=>'', 'category'=>'', 'source'=>'', 'content'=>''), $details=false) {
- 	global $db;
- 	global $_GET;
- 	$filter_cat = (isset($_GET['idp'])) ? ' WHERE id_collection='.$_GET['idp']: '';
- 	$tags = '<div class="btn-group">
-  <button type="button" class="btn btn-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-    <i class="fa fa-tags" aria-hidden="true"></i> Assigner une catégorie
-  </button>
-  <ul class="dropdown-menu">';
-	 $query = $db->query('SELECT DISTINCT trim(category) as category FROM presse '.$filter_cat.' ORDER BY category');
-	 $data = $query->fetchAll(PDO::FETCH_COLUMN);
-	foreach(tags($data) as $cat) {
-		$tags .= '<li><a class="dropdown-item" href="?do=add&id='.$array['id'].'&category='.$cat.'&token='.$_SESSION['token'].'&idp='.$_GET['idp'].'">'.$cat.'</a></li>';
-	 }
-	 /*
-	 while($data = $query->fetch()) {
-	 	$tags .= '<li><a class="dropdown-item" href="?do=add&id='.$array['id'].'&category='.$data['category'].'&token='.$_SESSION['token'].'" target="_blank">'.$data['category'].'</a></li>';
-	 } */
-	$tags .='</ul></div>';
-	$return = '<article>
-		    <header>
-		    <h1><a href="index.php?do=view&article='.$array['id'].'"><i class="fa fa-link" aria-hidden="true"></i></a> '.$array['title'].'</h1>
-		    <aside>
-		    <div class="d-print-none">
-				<a href="?do=add&id='.$array['id'].'" class="btn btn-primary" target="_blank"><i class="fa fa-pencil" aria-hidden="true"></i> Éditer</a>
-				<a href="?do=add&delete='.$array['id'].'&token='.$_SESSION['token'].'&idp='.$_GET['idp'].'" class="btn btn-danger"  onclick="return confirm(\'Êtes-vous sûr ?\');" target="_blank"><i class="fa fa-trash" aria-hidden="true"></i> Supprimer</a>
-			'.$tags.'
-		    <p><i class="fa fa-calendar" aria-hidden="true"></i> <time>'.$array['date'].'</time> ⋅ <i class="fa fa-newspaper-o" aria-hidden="true"></i> '.$array['journal'].' ⋅ <i class="fa fa-tags" aria-hidden="true"></i> '.$array['category'].' ⋅ <i class="fa fa-link" aria-hidden="true"></i> '.beautiful_url($array['source']).' ⋅ '.str_word_count((string)$array['content'],0).' mots</p>
-		    </aside>
-		    </header>
-		    <main>';
-		$return .= ($details == false) ? nl2br((string)$array['content']) : '<details><summary>Développer</summary>'.nl2br((string)$array['content']).'</details>';
-		$return .= '   </main>
-		</article>';
-		return $return;
-}
-if(!file_exists('data')) {
-    mkdir('data');
-    mkdir('data/export');
-    mkdir('data/import');
-    $db = new PDO('sqlite:data/data.db');
-    $db->query('
-CREATE TABLE "collections" (
-	"id"	INTEGER PRIMARY KEY AUTOINCREMENT,
-	"name"	TEXT
-);');
-    $db->query('
-CREATE TABLE "presse" (
-	"id"	INTEGER PRIMARY KEY AUTOINCREMENT,
-    "id_collection" INTEGER,
-	"date"	TEXT,
-	"journal"	TEXT,
-	"category"	TEXT,
-	"title"	TEXT,
-	"content"	TEXT,
-	"source"	TEXT
-);');
-    $db->query('
-CREATE TABLE "users" (
-	"id"	INTEGER PRIMARY KEY AUTOINCREMENT,
-	"login"	TEXT,
-	"password"	TEXT,
-	"permit"	INTEGER
-);');
-
-sql('INSERT INTO users (login, password, permit) VALUES (?, ?, ?)', array('admin', password_hash('admin', PASSWORD_DEFAULT), 1));
-}
-else {
-    $db = new PDO('sqlite:data/data.db');
-}
-
-if (!isset($_SESSION['login'])) {
-    $_SESSION['login'] = false;
-}
-if ($_SERVER['SERVER_NAME'] == 'localhost') {
-    $_SESSION['token'] = sha1(microtime());
-    $_SESSION['permit'] = 1;
-}
+include 'inc.php';
 ?>
 <!doctype html>
 <html>
@@ -326,7 +131,7 @@ if(isset($_GET['do'])) {
         		$filter_cat = (isset($_GET['idp'])) ? ' WHERE id_collection='.$_GET['idp']: '';
 				$date_begin = (isset($_POST['date_begin'])) ? $_POST['date_begin'] : '1900-01-01';
 				$date_end = (isset($_POST['date_end'])) ? $_POST['date_end'] : date('Y-m-d', time());
-		        echo'<form method="post" class="d-print-none">
+		        echo'<form method="get" class="d-print-none">
 		            <label>Collection</label>
 		            <select class="form-select" name="collection">';
 		                //$id_collection = (isset($_GET['idp'])) ? $_GET['idp'] : 0;
@@ -340,7 +145,7 @@ if(isset($_GET['do'])) {
 		            <label>Date de fin</label><input type="date" name="date_end" value="'.$date_end.'" class="form-control" />
 		            <label>Journaux</label>       
 		            <select class="form-select" multiple aria-label="multiple select" name="journal[]">';
-		                    $journal = (isset($_POST['journal'])) ? $_POST['journal'] : array();
+		                    $journal = (isset($_GET['journal'])) ? $_GET['journal'] : array();
 		                    $query = $db->query('SELECT DISTINCT trim(journal) as journal FROM presse '.$filter_cat.' ORDER BY journal');
 		                    while($data = $query->fetch()) {
 				               	$selected = (in_array($data['journal'], $journal)) ? 'selected' : '';
@@ -349,7 +154,7 @@ if(isset($_GET['do'])) {
 		           echo ' </select>
 		            <label>Catégories</label>
 		            <select class="form-select" multiple aria-label="multiple select" name="category[]">';
-		                $category = (isset($_POST['category'])) ? $_POST['category'] : array();
+		                $category = (isset($_GET['category'])) ? $_GET['category'] : array();
 		                $query = $db->query('SELECT DISTINCT trim(category) as category FROM presse '.$filter_cat.' ORDER BY category');
 		                $data = $query->fetchAll(PDO::FETCH_COLUMN);
 		                foreach(tags($data) as $cat) {
@@ -359,17 +164,19 @@ if(isset($_GET['do'])) {
 		           
 		            echo '</select>
 		            <label>Mot-clé</label> <input type="search" name="search" class="form-control"/>
+		            <input type="hidden" name="do" value="view"/>
+		            <input type="hidden" name="idp" value="'.$_GET['idp'].'"/>
 		            <input type="submit" name="submit" value="Exécuter" class="btn btn-primary mb-3"/>
 		            <input type="submit" name="submit_file" value="Exporter" class="btn btn-primary mb-3"/>
 					<a href="?do=view&sort='.$_GET['idp'].'" class="btn btn-primary mb-3">Trier</a>
 		            </form>';
-		    if(isset($_POST['submit']) OR isset($_GET['htmlview']) OR isset($_POST['submit_file'])) {
+		    if(isset($_GET['submit']) OR isset($_GET['htmlview']) OR isset($_GET['submit_file'])) {
 		    	if(isset($_GET['htmlview'])) {
 		    		$_POST['collection'] = $_GET['idp'];
 		    	}
-		    	  $period = (isset($_POST['date_begin']) AND isset($_POST['date_end'])) ? 'date >= date("'.$_POST['date_begin'].'") AND date <= date("'.$_POST['date_end'].'")' : '';
+		    	  $period = (isset($_GET['date_begin']) AND isset($_GET['date_end'])) ? 'date >= date("'.$_GET['date_begin'].'") AND date <= date("'.$_GET['date_end'].'")' : '';
 		        $journaux = '';
-		        if(isset($_POST['journal'])) {
+		        if(isset($_GET['journal'])) {
 		            $journaux .= 'AND (';
 		            foreach($_POST['journal'] as $journal) {
 		                $journaux .= 'journal LIKE "'.$journal.'" OR ';
@@ -379,9 +186,9 @@ if(isset($_GET['do'])) {
 		        }
 
 		        $categories = '';
-		        if(isset($_POST['category'])) {
+		        if(isset($_GET['category'])) {
 		            $categories .= 'AND (';
-		            foreach($_POST['category'] as $category) {
+		            foreach($_GET['category'] as $category) {
 		            	$cat_array = explode(" ", $category);
 		            	foreach($cat_array as $cat) {
 		                	$categories .= ' category LIKE "%'.$cat.'%" OR ';
@@ -391,10 +198,10 @@ if(isset($_GET['do'])) {
 		            $categories .=')';
 		        }
 		        $search = '';
-		        if(isset($_POST['search']) AND $_POST['search'] != '') {
-		            $search .= "AND (title LIKE '%".$_POST['search']."%' OR content LIKE '%".$_POST['search']."%')"; 
+		        if(isset($_GET['search']) AND $_GET['search'] != '') {
+		            $search .= "AND (title LIKE '%".$_GET['search']."%' OR content LIKE '%".$_GET['search']."%')"; 
 		        }
-		        $collection = (($period != '') ? 'AND ' : '').'id_collection='.$_POST['collection'];
+		        $collection = (($period != '') ? 'AND ' : '').'id_collection='.$_GET['collection'];
 		        $sql = 'SELECT * FROM presse WHERE '.$period.' '.$journaux.' '.$categories.' '.$search.' '.$collection.' ORDER BY date';
 		        echo '<h1>Corpus de la revue de presse (généré le '.date('c', time()).')</h1>';
 		        echo '<a href="javascript:window.print()">Imprimer</a>';
@@ -501,7 +308,7 @@ if(isset($_GET['do'])) {
 						$stats_output .= '</table></details>';
 				$stats_output .= quickchart('pie', $chart_journaux['category'], array($chart_journaux['data']));
 				 
-				 if(isset($_POST['submit_file'])) {
+				 if(isset($_GET['submit_file'])) {
 		            $filename = date('Y-m-d-His', time());
 		            mkdir('data/export/'.$filename);
 		            file_put_contents('data/export/'.$filename.'/query.txt', $sql);
@@ -538,16 +345,7 @@ if(isset($_GET['do'])) {
         break;
         case 'add':
         if(!check(@$_SESSION['login']) AND $_SERVER['SERVER_NAME'] !='localhost') {header('Location: index.php?do=login');}
-        	if(isset($_GET['delete']) AND isset($_GET['token']) AND $_GET['token'] == $_SESSION['token'] AND $_GET['token'] !='') {
-				sql('DELETE FROM presse WHERE id=?', array($_GET['delete']));
-				//redirect('index.php?do=view&idp='.$_GET['idp'].'');
-				echo '<script>window.close();window.location.reload();</script>';
-				
-			}
-			if(isset($_GET['id']) AND isset($_GET['category'])) {
-				sql('UPDATE presse SET category = ? WHERE id=?', array($category.' '.$_GET['category'], $_GET['id']));
-				redirect('index.php?do=view&sort='.$_GET['idp']);
-			}
+        	
 	        if (isset($_GET['id'])) {
 	            $something = sql('SELECT * FROM presse WHERE id=?', array(intval($_GET['id'])));
 	            $something->setFetchMode(PDO::FETCH_BOTH);
@@ -872,5 +670,28 @@ else {
 ?>
 </main>
 <footer><a href="https://framagit.org/justinmponcet/pressdb">Code source</a> - Version alpha</footer>
+<script>
+document.querySelectorAll('a[data-ajax]').forEach(link => {
+    link.addEventListener('click', function(e) {
+        e.preventDefault(); // Empêche la navigation normale
+        const url = this.getAttribute('href');
+
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    console.log('Action effectuée avec succès !');
+                    location.reload();
+                } else {
+                    alert('Erreur : ' + (data.message || 'Action impossible.'));
+                }
+            })
+            .catch(error => {
+                console.error('Erreur réseau :', error);
+                alert('Erreur réseau. Voir la console pour plus de détails.');
+            });
+    });
+});
+</script>
 </body>
 </html>
