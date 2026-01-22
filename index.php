@@ -129,7 +129,9 @@ if(isset($_GET['do'])) {
 			        $data = $something->fetch();
 			        $_GET['idp'] = $_GET['sort'];
 			        echo '<p class="alert alert-light">Article(s) restant(s) : '.$count['total'].'</p>';
-			        echo show_article($data);
+			        if($count['total'] >0) {
+			       		echo show_article($data);
+			        }
         	}
         	else {
         		$filter_cat = (isset($_GET['idp'])) ? ' WHERE id_collection='.$_GET['idp']: '';

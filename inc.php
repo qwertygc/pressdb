@@ -130,31 +130,36 @@ function badge($text) {
  function show_article($array=array('id'=>'', 'date'=>'', 'journal'=>'', 'category'=>'', 'source'=>'', 'content'=>''), $details=false) {
  	global $db;
  	global $_GET;
+ 	global $_SESSION;
  	$filter_cat = (isset($_GET['idp'])) ? ' WHERE id_collection='.$_GET['idp']: '';
- 	$tags = '<div class="btn-group">
-  <button type="button" class="btn btn-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-    <i class="fa fa-tags" aria-hidden="true"></i> Assigner une catégorie
-  </button>
-  <ul class="dropdown-menu">';
-	 $query = $db->query('SELECT DISTINCT LOWER(TRIM(category)) as category FROM presse '.$filter_cat.' ORDER BY LOWER(TRIM(category))');
-	 $data = $query->fetchAll(PDO::FETCH_COLUMN);
-	foreach(tags($data) as $cat) {
-		$tags .= '<li><a class="dropdown-item" href="api.php?do=update-category&id='.$array['id'].'&category='.$cat.'&token='.$_SESSION['token'].'&idp='.$_GET['idp'].'" data-ajax="true">'.$cat.'</a></li>';
-	 }
-	 /*
-	 while($data = $query->fetch()) {
-	 	$tags .= '<li><a class="dropdown-item" href="?do=add&id='.$array['id'].'&category='.$data['category'].'&token='.$_SESSION['token'].'" target="_blank">'.$data['category'].'</a></li>';
-	 } */
-	$tags .='</ul></div>';
 	$return = '<article>
 		    <header>
 		    <h1><a href="index.php?do=view&article='.$array['id'].'"><i class="fa fa-link" aria-hidden="true"></i></a> '.$array['title'].'</h1>
 		    <aside>
-		    <div class="d-print-none">
-				<a href="?do=add&id='.$array['id'].'" class="btn btn-primary" target="_blank"><i class="fa fa-pencil" aria-hidden="true"></i> Éditer</a>
+		    <div class="d-print-none">';
+	        if(!check(@$_SESSION['login']) AND $_SERVER['SERVER_NAME'] !='localhost') {
+	        }
+	        else {
+	         	$tags = '<div class="btn-group">
+					  <button type="button" class="btn btn-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+						<i class="fa fa-tags" aria-hidden="true"></i> Assigner une catégorie
+					  </button>
+					  <ul class="dropdown-menu">';
+						 $query = $db->query('SELECT DISTINCT LOWER(TRIM(category)) as category FROM presse '.$filter_cat.' ORDER BY LOWER(TRIM(category))');
+						 $data = $query->fetchAll(PDO::FETCH_COLUMN);
+						foreach(tags($data) as $cat) {
+							$tags .= '<li><a class="dropdown-item" href="api.php?do=update-category&id='.$array['id'].'&category='.$cat.'&token='.$_SESSION['token'].'&idp='.$_GET['idp'].'" data-ajax="true">'.$cat.'</a></li>';
+						 }
+						 /*
+						 while($data = $query->fetch()) {
+						 	$tags .= '<li><a class="dropdown-item" href="?do=add&id='.$array['id'].'&category='.$data['category'].'&token='.$_SESSION['token'].'" target="_blank">'.$data['category'].'</a></li>';
+						 } */
+						$tags .='</ul></div>';
+			$return .= '<a href="?do=add&id='.$array['id'].'" class="btn btn-primary" target="_blank"><i class="fa fa-pencil" aria-hidden="true"></i> Éditer</a>
 				<a  href="api.php?do=delete-entry&delete='.$array['id'].'&token='.$_SESSION['token'].'&idp='.$_GET['idp'].'" class="btn btn-danger"  onclick="return confirm(\'Êtes-vous sûr ?\');" data-ajax="true"><i class="fa fa-trash" aria-hidden="true"></i> Supprimer</a>
-			'.$tags.'
-		    <p><i class="fa fa-calendar" aria-hidden="true"></i> <time>'.$array['date'].'</time> ⋅ <i class="fa fa-newspaper-o" aria-hidden="true"></i> '.$array['journal'].' ⋅ '.badge($array['category']).' ⋅ <i class="fa fa-link" aria-hidden="true"></i> '.beautiful_url($array['source']).' ⋅ '.str_word_count((string)$array['content'],0).' mots</p>
+			'.$tags.'';
+			}
+		    $return .='<p><i class="fa fa-calendar" aria-hidden="true"></i> <time>'.$array['date'].'</time> ⋅ <i class="fa fa-newspaper-o" aria-hidden="true"></i> '.$array['journal'].' ⋅ '.badge($array['category']).' ⋅ <i class="fa fa-link" aria-hidden="true"></i> '.beautiful_url($array['source']).' ⋅ '.str_word_count((string)$array['content'],0).' mots</p>
 		    </aside>
 		    </header>
 		    <main>';
