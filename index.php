@@ -24,7 +24,7 @@ function exportcsv($entries, $filename) {
     $out = fopen($filename, 'w');
    // $out = fopen('php://output', 'w');
     foreach ($entries as $entry) {
-        fputcsv($out, $entry);
+        fputcsv($out, $entry, ',', '"', '');
     }
    // fclose($out);
     //die();
@@ -117,7 +117,7 @@ function tags($array) {
 	return $export;
 }
 		            
- function show_article($array=array('id'=>'', 'date'=>'', 'journal'=>'', 'category'=>'', 'source'=>'', 'content'=>'')) {
+ function show_article($array=array('id'=>'', 'date'=>'', 'journal'=>'', 'category'=>'', 'source'=>'', 'content'=>''), $details=false) {
  	global $db;
  	global $_GET;
  	$filter_cat = (isset($_GET['idp'])) ? ' WHERE id_collection='.$_GET['idp']: '';
@@ -136,7 +136,7 @@ function tags($array) {
 	 	$tags .= '<li><a class="dropdown-item" href="?do=add&id='.$array['id'].'&category='.$data['category'].'&token='.$_SESSION['token'].'" target="_blank">'.$data['category'].'</a></li>';
 	 } */
 	$tags .='</ul></div>';
-	return '<article>
+	$return = '<article>
 		    <header>
 		    <h1><a href="index.php?do=view&article='.$array['id'].'"><i class="fa fa-link" aria-hidden="true"></i></a> '.$array['title'].'</h1>
 		    <aside>
@@ -147,10 +147,11 @@ function tags($array) {
 		    <p><i class="fa fa-calendar" aria-hidden="true"></i> <time>'.$array['date'].'</time> ⋅ <i class="fa fa-newspaper-o" aria-hidden="true"></i> '.$array['journal'].' ⋅ <i class="fa fa-tags" aria-hidden="true"></i> '.$array['category'].' ⋅ <i class="fa fa-link" aria-hidden="true"></i> '.beautiful_url($array['source']).' ⋅ '.str_word_count((string)$array['content'],0).' mots</p>
 		    </aside>
 		    </header>
-		    <main>
-		    '.nl2br((string)$array['content']).'
-		    </main>
+		    <main>';
+		$return .= ($details == false) ? nl2br((string)$array['content']) : '<details><summary>Développer</summary>'.nl2br((string)$array['content']).'</details>';
+		$return .= '   </main>
 		</article>';
+		return $return;
 }
 if(!file_exists('data')) {
     mkdir('data');
@@ -308,13 +309,17 @@ if(isset($_GET['do'])) {
                 $something->setFetchMode(PDO::FETCH_BOTH);
                 $data = $something->fetch();
                 $_GET['idp'] = $data['id_collection'];
-                echo show_article($data);
+                echo show_article($data, false);
         	}
         	elseif(isset($_GET['sort'])) {
-        			$something = sql('SELECT * FROM presse WHERE id_collection=? AND category="à_trier" ORDER BY id DESC LIMIT 1', array(intval($_GET['sort'])));
+        			$something = sql('SELECT count(*) as total FROM presse WHERE id_collection=? AND category="à_trier"', array(intval($_GET['sort'])));
+			        $something->setFetchMode(PDO::FETCH_BOTH);
+			        $count = $something->fetch();
+        			$something = sql('SELECT * FROM presse WHERE id_collection=? AND category="à_trier" ORDER BY date ASC LIMIT 1', array(intval($_GET['sort'])));
 			        $something->setFetchMode(PDO::FETCH_BOTH);
 			        $data = $something->fetch();
 			        $_GET['idp'] = $_GET['sort'];
+			        echo '<p class="alert alert-light">Article(s) restant(s) : '.$count['total'].'</p>';
 			        echo show_article($data);
         	}
         	else {
@@ -403,7 +408,7 @@ if(isset($_GET['do'])) {
 		        $export[] = array('date', 'year', 'month', 'journal', 'category', 'title', 'content', 'source');
 		       
 		        while($data = $query->fetch()) {
-		        	$html_output .= show_article($data);
+		        	$html_output .= show_article($data, true);
 		            $export[] = array($data['date'], date('Y', strtotime($data['date'])), date('Y-m', strtotime($data['date'])),$data['journal'], $data['category'], $data['title'], $data['content'], $data['source']);
 		            $raw_txt .= $data['title'].' '.$data['content'].' ';
 		            $count++;
@@ -536,7 +541,7 @@ if(isset($_GET['do'])) {
         	if(isset($_GET['delete']) AND isset($_GET['token']) AND $_GET['token'] == $_SESSION['token'] AND $_GET['token'] !='') {
 				sql('DELETE FROM presse WHERE id=?', array($_GET['delete']));
 				//redirect('index.php?do=view&idp='.$_GET['idp'].'');
-				echo '<script>window.close();</script>';
+				echo '<script>window.close();window.location.reload();</script>';
 				
 			}
 			if(isset($_GET['id']) AND isset($_GET['category'])) {
