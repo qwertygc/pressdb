@@ -10,7 +10,7 @@ if(isset($_GET['do'])) {
 		case 'update-category':
 			if(isset($_GET['id']) AND isset($_GET['category'])  AND $_GET['token'] == $_SESSION['token'] AND $_GET['token'] !='') {
 				sql('UPDATE presse SET category = ? WHERE id=?', array($_GET['category'], $_GET['id']));
-				$response = ['success' => true, 'message' => 'Action effectuée'];
+				$response = ['success' => true, 'message' => 'Catégorie mise à jour'];
 			}
 			else {
 				$response = ['success' => false, 'message' => 'Paramètre(s) manquant(s)'];
@@ -19,7 +19,7 @@ if(isset($_GET['do'])) {
 		case 'delete-entry':
 			if(isset($_GET['delete']) AND isset($_GET['token']) AND $_GET['token'] == $_SESSION['token'] AND $_GET['token'] !='') {
 				sql('DELETE FROM presse WHERE id=?', array($_GET['delete']));
-				
+				$response = ['success' => true, 'message' => 'Article supprimé'];
 			}
 		break;
 	}

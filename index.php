@@ -404,7 +404,7 @@ if(isset($_GET['do'])) {
 	            } else {
 	                sql('UPDATE presse SET date = ?, journal = ?, category = ?, title=?, content = ?, source = ?, id_collection=? WHERE id=?', array($_POST['date'], $_POST['journal'], $_POST['category'], $_POST['title'], $_POST['content'], $_POST['source'], $_POST['collection'], $_POST['id']));
 	            }
-	            header('Location: index.php?do=view&id='.$_POST['id'].'');
+	            header('Location: index.php?do=view&article='.$_POST['id'].'');
 	        }
 	    echo '<form method="post" action="?do=add" class="d-print-none">
 	       <label>Ajout rapide</label> <input type="url" name="quick" class="form-control"/>
@@ -427,7 +427,7 @@ if(isset($_GET['do'])) {
 	            <label>Journal</label>       
 	            <input type="text" name="journal" list="journal" value="'.$journal.'" class="form-control"/>
 	            <datalist id="journal">';
-	              $query = $db->query('SELECT DISTINCT trim(journal) as journal FROM presse ORDER BY journal');
+	              $query = $db->query('SELECT DISTINCT lower(trim(journal)) as journal FROM presse ORDER BY journal');
 	              while($data = $query->fetch()) {
 	              	echo '<option value="'.$data['journal'].'" />';
 	              }
@@ -435,7 +435,7 @@ if(isset($_GET['do'])) {
 	            <label>Catégorie</label>
 	            <input type="text" name="category" list="category" value="'.$category.'" class="form-control"/>
 	            <datalist id="category">';
-	             $query = $db->query('SELECT DISTINCT trim(category) as category FROM presse ORDER BY category');
+	             $query = $db->query('SELECT DISTINCT lower(trim(category)) as category FROM presse ORDER BY category');
 	             $data = $query->fetchAll(PDO::FETCH_COLUMN);
                 foreach(tags($data) as $cat) {
                 	echo '<option value="'.$cat.'">'.$cat.'</option>';
