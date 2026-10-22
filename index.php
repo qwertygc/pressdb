@@ -62,10 +62,16 @@ include 'inc.php';
       <li class="nav-item d-flex align-items-center ms-2">
         <form method="get" action="index.php" class="d-flex" id="nav-collection-form">
           <input type="hidden" name="do" value="view"/>
+<?php foreach(array('date_begin', 'date_end', 'search', 'orderby', 'orderdir') as $np): if(!empty($_GET[$np])): ?>
+          <input type="hidden" name="<?= h($np) ?>" value="<?= h($_GET[$np]) ?>"/>
+<?php endif; endforeach; ?>
+<?php foreach(array('journal', 'category') as $npa): if(!empty($_GET[$npa]) AND is_array($_GET[$npa])): foreach($_GET[$npa] as $npv): ?>
+          <input type="hidden" name="<?= h($npa) ?>[]" value="<?= h($npv) ?>"/>
+<?php endforeach; endif; endforeach; ?>
           <select name="idp" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="Collection">
             <option value="">Toutes les collections</option>
 <?php
-$collections_nav = sql('SELECT c.id, c.name, (SELECT COUNT(*) FROM presse p WHERE p.id_collection = c.id AND p.category = ?) as a_trier FROM collections c ORDER BY c.name', array('à_trier'));
+$collections_nav = sql('SELECT c.id, c.name, (SELECT COUNT(*) FROM presse p WHERE p.id_collection = c.id AND p.category = ?) as a_trier FROM collections c WHERE 1=1'.public_collections_clause('c').' ORDER BY c.name', array('à_trier'));
 while($col_nav = $collections_nav->fetch()):
   $sel = ((int)@$_GET['idp'] === (int)$col_nav['id']) ? ' selected' : '';
 ?>
@@ -112,17 +118,22 @@ if(isset($_GET['do'])) {
         echo '<form method="post" class="d-print-none" action="?do=collections">
                '.csrf_field().'
                <label>Nom de la collection</label><input type="text" name="collection_name" class="form-control" />
+               <div class="form-check"><input type="checkbox" name="collection_public" value="1" class="form-check-input" id="collectionPublic"/><label class="form-check-label" for="collectionPublic">Lecture publique (visible sans connexion)</label></div>
                <input type="submit" class="btn btn-primary mb-3"/>
                 </form>';
             if(isset($_POST['collection_name']) AND csrf_ok('POST')) {
-                sql('INSERT into collections (name) VALUES (?)', array($_POST['collection_name']));
+                sql('INSERT into collections (name, public) VALUES (?, ?)', array($_POST['collection_name'], (isset($_POST['collection_public'])) ? 1 : 0));
+            }
+            if(isset($_POST['toggle_public']) AND csrf_ok('POST')) {
+            	sql('UPDATE collections SET public = ((public + 1) % 2) WHERE id = ?', array(intval($_POST['toggle_public'])));
             }
             echo '<table class="table">
                     <tr><th>Collections</th><th>Actions</th></tr>';
-            $query = $db->query('SELECT * FROM collections ORDER BY id');
+            $query = $db->query('SELECT c.*, (SELECT COUNT(*) FROM presse p WHERE p.id_collection = c.id AND p.category = ?) as a_trier FROM collections c ORDER BY c.id', array('à_trier'));
             while($data = $query->fetch()) {
-                echo '<tr><td><a href="?do=view&idp='.intval($data['id']).'">'.h($data['name']).'</a></td>
+                echo '<tr><td><a href="?do=view&idp='.intval($data['id']).'">'.h($data['name']).'</a> '.((intval($data['public']) === 1) ? '<span class="badge text-bg-success">public</span>' : '<span class="badge text-bg-secondary">priv'.'ée</span>').((intval($data['a_trier']) > 0) ? ' <span class="badge text-bg-warning">'.intval($data['a_trier']).' '.' à trier'</span>' : '').'</td>
                     <td>
+                    <form method="post" action="?do=collections" style="display:inline">'.csrf_field().'<input type="hidden" name="toggle_public" value="'.intval($data['id']).'"/><button type="submit" class="btn btn-sm btn-outline-secondary" title="Basculer public/priv'.'ée"><i class="fa fa-eye'.((intval($data['public']) === 1) ? '' : '-slash').'" aria-hidden="true"></i></button></form>
                     <div class="btn-group" role="group" aria-label="Basic example">
                         <a href="?do=view&idp='.intval($data['id']).'" class="btn btn-primary btn-sm"><i class="fa fa-eye" aria-hidden="true"></i> Voir</a>
                         <a href="?do=view&sort='.intval($data['id']).'" class="btn btn-primary btn-sm"><i class="fa fa-sort"></i> Trier</a>
@@ -138,7 +149,7 @@ if(isset($_GET['do'])) {
         case 'view':
         	#if(!check(@$_SESSION['login']) AND $_SERVER['SERVER_NAME'] !='localhost') {header('Location: index.php?do=login');}
         	if(isset($_GET['article'])) {
-        		$something = sql('SELECT * FROM presse WHERE id=?', array(intval($_GET['article'])));
+        		$something = sql('SELECT p.* FROM presse p JOIN collections c ON c.id = p.id_collection WHERE p.id = ?'.public_collections_clause('c'), array(intval($_GET['article'])));
                 $something->setFetchMode(PDO::FETCH_BOTH);
                 $data = $something->fetch();
                 $_GET['idp'] = $data['id_collection'];
@@ -188,7 +199,7 @@ echo '<form method="get" class="card card-body bg-light">';
 echo '<input type="hidden" name="do" value="view"/>';
 echo '<div class="row g-2"><div class="col-md-4"><label class="form-label">Collection</label>';
 echo '<select class="form-select" name="collection">';
-$query = $db->query('SELECT * FROM collections ORDER BY name');
+$query = $db->query('SELECT * FROM collections c WHERE 1=1'.public_collections_clause('c').' ORDER BY name');
 echo '<option value="">Toutes</option>';
 while($data = $query->fetch()) {
 	$selected = ((int)$data['id'] === $active_collection) ? ' selected' : '';
@@ -260,6 +271,15 @@ echo '</form></div></div>';
 		        }
 		        $collection = ((intval(@$_GET['collection']) > 0) ? ((trim($period.' '.$journaux.' '.$categories.' '.$search) != '') ? 'AND ' : '').'id_collection=?' : '');
 		        if(intval(@$_GET['collection']) > 0) {$params[] = intval($_GET['collection']);}
+		        if(!is_logged()) {
+		        	$visible_cols = sql('SELECT id FROM collections WHERE public = 1', array())->fetchAll(PDO::FETCH_COLUMN);
+		        	if(count($visible_cols) > 0) {
+		        		$collection .= (($collection !== '') ? ' AND ' : '').'id_collection IN ('.implode(',', array_map('intval', $visible_cols)).')';
+		        	}
+		        	else {
+		        		$collection = '1=0';
+		        	}
+		        }
 		        $sortable = array('date' => 'date', 'journal' => 'journal', 'title' => 'title');
 		        $order_col = (isset($_GET['orderby']) AND isset($sortable[$_GET['orderby']])) ? $sortable[$_GET['orderby']] : 'date';
 		        $order_dir = (isset($_GET['orderdir']) AND strtolower($_GET['orderdir']) === 'desc') ? 'DESC' : 'ASC';
@@ -433,17 +453,31 @@ echo '</form></div></div>';
 				$stats_output .= quickchart('pie', $chart_journaux['category'], array($chart_journaux['data']));
 				 
 				 if(isset($_GET['submit_file'])) {
-		            $filename = date('Y-m-d-His', time());
+		            $slug_parts = array();
+		            if(intval(@$_GET['collection']) > 0) {
+		            	$cn = sql('SELECT name FROM collections WHERE id = ?', array(intval($_GET['collection'])))->fetch();
+		            	if($cn) {$slug_parts[] = no_accents($cn['name']);}
+		            }
+		            if(!empty($_GET['date_begin']) AND $_GET['date_begin'] != '1900-01-01') {$slug_parts[] = $_GET['date_begin'];}
+		            if(!empty($_GET['date_end']) AND $_GET['date_end'] != date('Y-m-d')) {$slug_parts[] = $_GET['date_end'];}
+		            foreach((array)@$_GET['category'] as $c) {$slug_parts[] = no_accents($c);}
+		            if(!empty($_GET['search'])) {$slug_parts[] = no_accents($_GET['search']);}
+		            $slug = implode('-', $slug_parts);
+		            $slug = preg_replace('/[^a-z0-9-]+/', '-', strtolower($slug));
+		            $slug = trim($slug, '-');
+		            $slug = substr($slug, 0, 60);
+		            $export_name = 'presse'.(($slug !== '') ? '-'.$slug : '').'-'.date('Y-m-d-His');
+		            $filename = $export_name;
 		            mkdir('data/export/'.$filename);
 		            file_put_contents('data/export/'.$filename.'/query.txt', $sql);
 		            exportcsv($export, 'data/export/'.$filename.'/presse.csv');
 		            exportiramuteq($export, 'data/export/'.$filename.'/presse_iramuteq.txt');
 		            file_put_contents('data/export/'.$filename.'/presse_raw.txt', $raw_txt);
-		            ZipDir('data/export/'.$filename.'/export-'.$filename.'.zip', 'data/export/'.$filename);
+		            ZipDir('data/export/'.$filename.'/'.(($export_name) ?? 'export-'.$filename).'.zip', 'data/export/'.$filename);
 		           //redirect('data/export/'.$filename.'.zip');
 		            
 		            echo '
-		            <a href="api.php?do=export-file&dir='.$filename.'&file=export-'.$filename.'.zip&token='.h($_SESSION['token']).'" class="btn btn-primary"><i class="fa fa-file-archive-o" aria-hidden="true"></i> Archive (zip)</a> 
+		            <a href="api.php?do=export-file&dir='.$filename.'&file='.$filename.'.zip&token='.h($_SESSION['token']).'" class="btn btn-primary"><i class="fa fa-file-archive-o" aria-hidden="true"></i> Archive (zip)</a> 
 		            <a href="api.php?do=export-file&dir='.$filename.'&file=query.txt&token='.h($_SESSION['token']).'" class="btn btn-primary"><i class="fa fa-database" aria-hidden="true"></i> Requête SQL</a> 
 		            <a href="api.php?do=export-file&dir='.$filename.'&file=presse_iramuteq.txt&token='.h($_SESSION['token']).'" class="btn btn-primary"><i class="fa fa-download" aria-hidden="true"></i> Fichier Iramuteq</a> 
 		            <a href="api.php?do=export-file&dir='.$filename.'&file=presse.csv&token='.h($_SESSION['token']).'" class="btn btn-primary"><i class="fa fa-download" aria-hidden="true"></i> Fichier CSV</a> 
@@ -559,7 +593,7 @@ echo '</form></div></div>';
 	        <label>Collection</label>
 	        <select class="form-select" name="collection">';
 	            //$id_collection = (isset($_GET['idp'])) ? $_GET['idp'] : 0;
-	            $query = $db->query('SELECT * FROM collections ORDER BY id');
+	            $query = $db->query('SELECT c.*, (SELECT COUNT(*) FROM presse p WHERE p.id_collection = c.id AND p.category = ?) as a_trier FROM collections c ORDER BY c.id', array('à_trier'));
 	            while($data = $query->fetch()) {
 			        $selected = ((int)$data['id'] == (int)$id_collection) ? 'selected' : '';
 			      	echo '<option value="'.$data['id'].'" '.$selected.'>'.$data['name'].'</option>';

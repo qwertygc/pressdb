@@ -243,7 +243,8 @@ if(!file_exists('data')) {
 		$db->query('
 CREATE TABLE "collections" (
 	"id"	INTEGER PRIMARY KEY AUTOINCREMENT,
-	"name"	TEXT
+	"name"	TEXT,
+	"public"	INTEGER DEFAULT 0
 );');
 		$db->query('
 CREATE TABLE "presse" (
@@ -310,6 +311,10 @@ function article_categories($id_presse) {
 	if($id_presse <= 0) {return array();}
 	return sql('SELECT c.name FROM presse_categories pc JOIN categories c ON c.id = pc.id_category WHERE pc.id_presse = ? ORDER BY c.name', array($id_presse))->fetchAll(PDO::FETCH_COLUMN);
 }
+function public_collections_clause($alias) {
+	if(is_logged()) {return '';}
+	return ' AND ('.$alias.'.public = 1)';
+}
 function categories_list($id_collection = null) {
 	if($id_collection !== null) {
 		return sql('SELECT DISTINCT c.name FROM categories c JOIN presse_categories pc ON pc.id_category = c.id JOIN presse p ON p.id = pc.id_presse WHERE p.id_collection = ? ORDER BY c.name', array((int)$id_collection))->fetchAll(PDO::FETCH_COLUMN);
@@ -321,6 +326,10 @@ function migrate_categories() {
 	foreach($data as $row) {
 		article_set_categories($row['id'], $row['category']);
 	}
+}
+$col_public = sql("SELECT count(*) as n FROM pragma_table_info('collections') WHERE name = 'public'", array())->fetch();
+if((int)$col_public['n'] === 0) {
+	$db->query('ALTER TABLE collections ADD COLUMN public INTEGER DEFAULT 0;');
 }
 $cat_tables = sql("SELECT count(*) as n FROM sqlite_master WHERE type='table' AND name IN ('categories', 'presse_categories')", array())->fetch();
 if((int)$cat_tables['n'] < 2) {
