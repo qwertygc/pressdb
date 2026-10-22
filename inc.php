@@ -226,7 +226,7 @@ function badge($text) {
 			</div>';
 		}
 	    $return .='</header>
-	    <p class="mb-1 mt-1 small text-muted"><i class="fa fa-calendar" aria-hidden="true"></i> <time>'.h($array['date']).'</time> ⋅ <i class="fa fa-newspaper-o" aria-hidden="true"></i> '.h($array['journal']).' ⋅ '.badge($array['category']).' ⋅ <i class="fa fa-link" aria-hidden="true"></i> '.beautiful_url($array['source']).' ⋅ '.str_word_count((string)$array['content'],0).' mots</p>';
+	    <p class="mb-1 mt-1 small text-muted"><time datetime="'.h($array['date']).'"><strong>'.h($array['date']).'</strong></time> ⋅ <i class="fa fa-newspaper-o" aria-hidden="true"></i> '.h($array['journal']).' ⋅ '.badge($array['category']).' ⋅ <i class="fa fa-link" aria-hidden="true"></i> '.beautiful_url($array['source']).((!empty($array['dupe_count'])) ? ' ⋅ <span class="badge text-bg-warning" title="Titre partagé avec '.(int)$array['dupe_count'].' autre(s) article(s)"><i class="fa fa-exclamation-triangle" aria-hidden="true"></i> doublon ×'.((int)$array['dupe_count'] + 1).'</span>' : '').' ⋅ '.str_word_count((string)$array['content'],0).' mots</p>';
 	    $main_class = ($details == true) ? 'article-full' : 'article-compact';
 	    $return .= '<main class="'.$main_class.'">';
 		$return .= ($details == false) ? nl2br(h($array['content'])) : '<details><summary>Développer</summary>'.nl2br(h($array['content'])).'</details>';

@@ -182,10 +182,6 @@ if(count($active_badges) > 0) {
 	echo '<a class="btn btn-sm btn-outline-secondary" href="index.php?do=view">Tout effacer</a>';
 	echo '</p>';
 }
-echo '<p>';
-echo '<a class="btn btn-outline-primary btn-sm" data-bs-toggle="collapse" href="#filterPanel" role="button" aria-expanded="false" aria-controls="filterPanel"><i class="fa fa-filter" aria-hidden="true"></i> Filtres</a> ';
-echo '<a class="btn btn-outline-primary btn-sm" href="?do=view&sort='.$active_collection.'"><i class="fa fa-sort" aria-hidden="true"></i> Trier</a>';
-echo '</p>';
 echo '<div class="collapse" id="filterPanel">';
 echo '<form method="get" class="card card-body bg-light">';
 echo '<input type="hidden" name="do" value="view"/>';
@@ -295,8 +291,23 @@ echo '</form></div></div>';
 		        		}
 		        	}
 		        }
-		        echo '<h1>Corpus de la revue de presse (généré le '.date('c', time()).')</h1>';
-		        echo '<a href="javascript:window.print()">Imprimer</a>';
+		        echo '<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">';
+		        echo '<h1 class="h4 mb-0">Revue de presse <span class="badge text-bg-primary">'.$total_rows.'</span></h1>';
+		        echo '<div class="d-flex gap-2 d-print-none">';
+		        echo '<a class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" href="#filterPanel" role="button" aria-expanded="false" aria-controls="filterPanel"><i class="fa fa-filter" aria-hidden="true"></i> Filtres</a> ';
+		        echo '<button type="button" id="densityToggle" class="btn btn-sm btn-outline-secondary"><i class="fa fa-list" aria-hidden="true"></i> <span id="densityLabel">Vue détaillée</span></button>';
+		        echo '<div class="btn-group btn-sm" role="group" aria-label="Tri">';
+		        foreach(array('date' => 'Date', 'journal' => 'Journal', 'title' => 'Titre') as $col => $label) {
+		        	$active = ($order_col == $col) ? 'btn-secondary' : 'btn-outline-secondary';
+		        	$arrow = ($order_col == $col) ? (($order_dir == 'ASC') ? ' <i class="fa fa-sort-asc" aria-hidden="true"></i>' : ' <i class="fa fa-sort-desc" aria-hidden="true"></i>') : '';
+		        	$next = ($order_col == $col AND $order_dir == 'ASC') ? 'desc' : 'asc';
+		        	echo '<a class="btn btn-sm '.$active.'" href="'.h($sort_url.'&orderby='.$col.'&orderdir='.$next).'">'.$label.$arrow.'</a>';
+		        }
+		        echo '</div>';
+		        echo '<a class="btn btn-sm btn-outline-primary" href="?do=view&sort='.intval(@$_GET['idp']).'"><i class="fa fa-sort" aria-hidden="true"></i> À trier</a>';
+		        echo '<button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="fa fa-print" aria-hidden="true"></i> Imprimer</button>';
+		        echo '</div></div>';
+		        echo '<p class="text-muted small mb-2">Généré le '.date('d/m/Y H:i').' — page '.$current_page.' / '.max(1, $total_pages_display).'</p>';
 		        $query = sql($sql, $params);
 		        $count = 0;
 		        $base_qs = $_GET;
@@ -309,7 +320,17 @@ echo '</form></div></div>';
 		        $export = array();
 		        $export[] = array('date', 'year', 'month', 'journal', 'category', 'title', 'content', 'source');
 		       
-		        while($data = $query->fetch()) {
+		        $page_rows = $query->fetchAll();
+		        $dupe_map = array();
+		        if(count($page_rows) > 0) {
+		        	$titles = array();
+		        	foreach($page_rows as $r) {$titles[] = $r['title'];}
+		        	$qs = implode(',', array_fill(0, count($titles), '?'));
+		        	$dupes = sql('SELECT lower(trim(title)) as t, count(*) as n FROM presse WHERE lower(trim(title)) IN ('.$qs.') GROUP BY lower(trim(title)) HAVING count(*) > 1', $titles)->fetchAll();
+		        	foreach($dupes as $d) {$dupe_map[$d['t']] = (int)$d['n'] - 1;}
+		        }
+		        foreach($page_rows as $data) {
+		        	$data['dupe_count'] = (isset($dupe_map[strtolower(trim((string)$data['title']))])) ? $dupe_map[strtolower(trim((string)$data['title']))] : 0;
 		        	$html_output .= show_article($data, true, true);
 		        	$count++;
 		        }
@@ -439,13 +460,6 @@ echo '</form></div></div>';
 				</ul>
 				<div class="tab-content" id="myTabContent">
 				  <div class="tab-pane fade show active" id="html-tab-pane" role="tabpanel" aria-labelledby="html-tab" tabindex="0">'
-				  .'<p class="d-flex flex-wrap align-items-center gap-2"><span>'.$total_rows.' article(s) — page '.$current_page.'/'.$total_pages_display.'</span>'
-				  .'<button type="button" id="densityToggle" class="btn btn-sm btn-outline-secondary"><i class="fa fa-list" aria-hidden="true"></i> <span id="densityLabel">Vue détaillée</span></button>'
-				  .'<span class="ms-2">Trier par : </span>'
-				  .'<a class="btn btn-sm '.(($order_col=='date')?'btn-secondary':'btn-outline-secondary').'" href="'.h($sort_url.'&orderby=date&orderdir='.($order_col=='date'&&$order_dir=='ASC'?'desc':'asc')).'">Date</a> '
-				  .'<a class="btn btn-sm '.(($order_col=='journal')?'btn-secondary':'btn-outline-secondary').'" href="'.h($sort_url.'&orderby=journal&orderdir='.($order_col=='journal'&&$order_dir=='ASC'?'desc':'asc')).'">Journal</a> '
-				  .'<a class="btn btn-sm '.(($order_col=='title')?'btn-secondary':'btn-outline-secondary').'" href="'.h($sort_url.'&orderby=title&orderdir='.($order_col=='title'&&$order_dir=='ASC'?'desc':'asc')).'">Titre</a> '
-				  .'</p>'
 				  .((is_logged()) ? '<form method="post" action="index.php?do=view" class="d-print-none mb-3">'.csrf_field().'<div class="input-group"><span class="input-group-text">Tout <input type="checkbox" onclick="document.querySelectorAll(\'input[name^=bulk_ids]\').forEach(c => c.checked = this.checked)"/></span><select name="bulk_action" class="form-select"><option value="categorize">Catégoriser</option><option value="move">Déplacer</option><option value="delete">Supprimer</option></select><input type="text" name="bulk_category" placeholder="catégories (espaces)" class="form-control"/><select name="bulk_collection" class="form-select">' : '')
 				  .((is_logged()) ? implode('', array_map(function($c) {return '<option value="'.intval($c['id']).'">'.h($c['name']).'</option>';}, sql('SELECT id, name FROM collections ORDER BY name', array())->fetchAll())) : '')
 				  .((is_logged()) ? '</select><button type="submit" class="btn btn-primary">Appliquer à la sélection cochée</button></div></form>' : '')
@@ -867,7 +881,20 @@ else {
 }
 ?>
 </main>
-<footer><a href="https://framagit.org/justinmponcet/pressdb">Code source</a> - Version alpha</footer>
+<footer class="mt-4 py-3 border-top d-print-none">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 small text-muted">
+        <span><i class="fa fa-database" aria-hidden="true"></i>
+<?php
+$footer_stats = sql('SELECT (SELECT count(*) FROM presse) as articles, (SELECT count(*) FROM collections) as collections', array())->fetch();
+echo (int)$footer_stats['articles'].' article(s) dans '.(int)$footer_stats['collections'].' collection(s)';
+?>
+        </span>
+        <span>
+            <a class="link-secondary" href="https://framagit.org/justinmponcet/pressdb"><i class="fa fa-code" aria-hidden="true"></i> Code source</a>
+            · PressDB <em>alpha</em>
+        </span>
+    </div>
+</footer>
 <script>
 document.querySelectorAll('a[data-ajax]').forEach(link => {
     link.addEventListener('click', function(e) {
