@@ -630,7 +630,7 @@ if(isset($_GET['do'])) {
         			if(rmdir($dir)) {$purged++;}
         		}
         	}
-        	echo '<div class="alert alert-success">'.$purged.' dossier(s) d\'export purgé(s).</div>
+        	echo '<div class="alert alert-success">'.$purged.' dossier(s) d\'export purgé(s).</div>';
         }
 
         echo '<h1>Fusionner deux collections</h1>';
