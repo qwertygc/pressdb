@@ -133,7 +133,7 @@ if(isset($_GET['do'])) {
             while($data = $query->fetch()) {
                 echo '<tr><td><a href="?do=view&idp='.intval($data['id']).'">'.h($data['name']).'</a> '.((intval($data['public']) === 1) ? '<span class="badge text-bg-success">public</span>' : '<span class="badge text-bg-secondary">privée</span>').((intval($data['a_trier']) > 0) ? ' <span class="badge text-bg-warning">'.intval($data['a_trier']).' à trier</span>' : '').'</td>
                     <td>
-                    <form method="post" action="?do=collections" style="display:inline">'.csrf_field().'<input type="hidden" name="toggle_public" value="'.intval($data['id']).'"/>'<button type="submit" class="btn btn-sm btn-outline-secondary" title="Basculer public/privée">'<i class="fa fa-eye'.((intval($data['public']) === 1) ? '' : '-slash').'" aria-hidden="true"></i></button></form>
+                    <form method="post" action="?do=collections" style="display:inline">'.csrf_field().'<input type="hidden" name="toggle_public" value="'.intval($data['id']).'"/>'.'<button type="submit" class="btn btn-sm btn-outline-secondary" title="Basculer public/privée">'.'<i class="fa fa-eye'.((intval($data['public']) === 1) ? '' : '-slash').'" aria-hidden="true"></i></button></form>
                     <div class="btn-group" role="group" aria-label="Basic example">
                         <a href="?do=view&idp='.intval($data['id']).'" class="btn btn-primary btn-sm"><i class="fa fa-eye" aria-hidden="true"></i> Voir</a>
                         <a href="?do=view&sort='.intval($data['id']).'" class="btn btn-primary btn-sm"><i class="fa fa-sort"></i> Trier</a>
