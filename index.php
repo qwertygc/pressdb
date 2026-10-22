@@ -413,8 +413,7 @@ if(isset($_GET['do'])) {
 				  .'<a class="btn btn-sm '.(($order_col=='date')?'btn-secondary':'btn-outline-secondary').'" href="'.h($sort_url.'&orderby=date&orderdir='.($order_col=='date'&&$order_dir=='ASC'?'desc':'asc')).'">Date</a> '
 				  .'<a class="btn btn-sm '.(($order_col=='journal')?'btn-secondary':'btn-outline-secondary').'" href="'.h($sort_url.'&orderby=journal&orderdir='.($order_col=='journal'&&$order_dir=='ASC'?'desc':'asc')).'">Journal</a> '
 				  .'<a class="btn btn-sm '.(($order_col=='title')?'btn-secondary':'btn-outline-secondary').'" href="'.h($sort_url.'&orderby=title&orderdir='.($order_col=='title'&&$order_dir=='ASC'?'desc':'asc')).'">Titre</a> '
-				  .'</p>'.
-'
+				  .'</p>'
 				  .((is_logged()) ? '<form method="post" action="index.php?do=view" class="d-print-none mb-3">'.csrf_field().'<div class="input-group"><span class="input-group-text">Tout <input type="checkbox" onclick="document.querySelectorAll(\'input[name^=bulk_ids]\').forEach(c => c.checked = this.checked)"/></span><select name="bulk_action" class="form-select"><option value="categorize">Catégoriser</option><option value="move">Déplacer</option><option value="delete">Supprimer</option></select><input type="text" name="bulk_category" placeholder="catégories (espaces)" class="form-control"/><select name="bulk_collection" class="form-select">' : '')
 				  .((is_logged()) ? implode('', array_map(function($c) {return '<option value="'.intval($c['id']).'">'.h($c['name']).'</option>';}, sql('SELECT id, name FROM collections ORDER BY name', array())->fetchAll())) : '')
 				  .((is_logged()) ? '</select><button type="submit" class="btn btn-primary">Appliquer à la sélection cochée</button></div></form>' : '')
