@@ -526,7 +526,7 @@ if(isset($_GET['do'])) {
 		  		echo '<a href="?do=tools&delete_doublon=yes&id_collection='.intval($collections['id']).'&token='.h($_SESSION['token']).'" class="btn btn-danger"><i class="fa fa-trash" aria-hidden="true"></i> Supprimer les doublons</a>';
 		  	}
       		if(isset($_GET['delete_doublon']) AND is_logged() AND csrf_ok('GET')) {
-      			sql('DELETE FROM presse WHERE id NOT IN (SELECT MAX(id) FROM presse GROUP BY title) AND id_collection=?', array(intval($_GET['id_collection'])));
+      			sql('DELETE FROM presse WHERE id NOT IN (SELECT MAX(id) FROM presse GROUP BY title, id_collection) AND id_collection=?', array(intval($_GET['id_collection'])));
       			redirect('index.php?do=tools');
       		}
         break;
@@ -669,6 +669,7 @@ if(isset($_GET['do'])) {
 				$something->execute(array($_POST['login']));
 				$data = $something->fetch();
                 if ($data AND password_verify($_POST['pwd'], $data['password']) AND $_POST['login'] == $data['login']) {
+                    session_regenerate_id(true);
                     $_SESSION['login'] = true;
                     $_SESSION['permit'] = (int)$data['permit'];
                     $_SESSION['token'] = bin2hex(random_bytes(16));

@@ -1,4 +1,5 @@
 <?php
+session_set_cookie_params(['httponly' => true, 'samesite' => 'Strict', 'secure' => (!empty($_SERVER['HTTPS']) AND $_SERVER['HTTPS'] !== 'off')]);
 session_start();
 use voku\helper\HtmlDomParser;
 include 'vendor/autoload.php';
@@ -198,10 +199,21 @@ CREATE TABLE "users" (
 );');
 
 	sql('INSERT INTO users (login, password, permit) VALUES (?, ?, ?)', array('admin', password_hash('admin', PASSWORD_DEFAULT), 1));
-		file_put_contents('data/.htaccess', '<FilesMatch "\.(db|sqlite)$">'."\n".'Require all denied'."\n".'</FilesMatch>'."\n");
 }
 else {
     $db = new PDO('sqlite:data/data.db');
+}
+
+if(!file_exists('data/.htaccess')) {
+	file_put_contents('data/.htaccess', '<FilesMatch "\.(db|sqlite)$">'."\n".'Require all denied'."\n".'</FilesMatch>'."\n");
+}
+if(!file_exists('data/import/.htaccess')) {
+	if(!is_dir('data/import')) {mkdir('data/import', 0775, true);}
+	file_put_contents('data/import/.htaccess', 'php_flag engine off'."\n".'SetHandler none'."\n".'Require all denied'."\n");
+}
+if(!file_exists('data/export/.htaccess')) {
+	if(!is_dir('data/export')) {mkdir('data/export', 0775, true);}
+	file_put_contents('data/export/.htaccess', 'php_flag engine off'."\n".'SetHandler none'."\n");
 }
 
 if (!isset($_SESSION['login'])) {
