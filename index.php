@@ -264,7 +264,7 @@ echo '</form></div></div>';
 		        $collection = (($period != '') ? 'AND ' : '').'id_collection=?';
 		        $params[] = intval(@$_GET['collection']);
 		        $sortable = array('date' => 'date', 'journal' => 'journal', 'title' => 'title');
-		        $order_col = (isset($sortable[@$_GET['orderby']])) ? $sortable[$_GET['orderby']] : 'date';
+		        $order_col = (isset($_GET['orderby']) AND isset($sortable[$_GET['orderby']])) ? $sortable[$_GET['orderby']] : 'date';
 		        $order_dir = (isset($_GET['orderdir']) AND strtolower($_GET['orderdir']) === 'desc') ? 'DESC' : 'ASC';
 		        $per_page = 50;
 		        $current_page = (isset($_GET['page'])) ? max(1, intval($_GET['page'])) : 1;
