@@ -271,15 +271,15 @@ echo '</form></div></div>';
 		        }
 		        $collection = ((intval(@$_GET['collection']) > 0) ? ((trim($period.' '.$journaux.' '.$categories.' '.$search) != '') ? 'AND ' : '').'id_collection=?' : '');
 		        if(intval(@$_GET['collection']) > 0) {$params[] = intval($_GET['collection']);}
-		        if(!is_logged()) {
-		        	$visible_cols = sql('SELECT id FROM collections WHERE public = 1', array())->fetchAll(PDO::FETCH_COLUMN);
-		        	if(count($visible_cols) > 0) {
-		        		$collection .= (($collection !== '') ? ' AND ' : '').'id_collection IN ('.implode(',', array_map('intval', $visible_cols)).')';
-		        	}
-		        	else {
-		        		$collection = '1=0';
-		        	}
-		        }
+		$visible_cols = sql('SELECT c.id FROM collections c WHERE 1=1'.public_collections_clause('c'), array())->fetchAll(PDO::FETCH_COLUMN);
+		if(!is_admin()) {
+			if(count($visible_cols) > 0) {
+				$collection .= (($collection !== '') ? ' AND ' : '').'id_collection IN ('.implode(',', array_map('intval', $visible_cols)).')';
+			}
+			else {
+				$collection = '1=0';
+			}
+		}
 		        $sortable = array('date' => 'date', 'journal' => 'journal', 'title' => 'title');
 		        $order_col = (isset($_GET['orderby']) AND isset($sortable[$_GET['orderby']])) ? $sortable[$_GET['orderby']] : 'date';
 		        $order_dir = (isset($_GET['orderdir']) AND strtolower($_GET['orderdir']) === 'desc') ? 'DESC' : 'ASC';
@@ -815,6 +815,7 @@ echo '</form></div></div>';
         case 'admin':
         if(!is_admin()) {redirect('index.php?do=login');}
         
+			$user_collections = array();
 			if(isset($_GET['id'])) {
 				$something = $db->prepare("SELECT * FROM users WHERE id=?");
 				$something->execute(array((int)$_GET['id']));
@@ -823,6 +824,7 @@ echo '</form></div></div>';
 				$password = '';
 				$id = intval($_GET['id']);
 				$permit = ($data['permit'] == 1) ? 'checked' : '';
+				$user_collections = sql('SELECT id_collection FROM users_collections WHERE id_user = ?', array($id))->fetchAll(PDO::FETCH_COLUMN);
 			}
 			else {
 				$courriel = '';
@@ -844,7 +846,26 @@ echo '</form></div></div>';
 				}
 				else {
 				   sql('INSERT INTO users (login, password, permit) VALUES (?, ?, ?)', array($_POST['login'], password_hash($_POST['pwd'], PASSWORD_DEFAULT), $_POST['permit']));
+				   $_POST['id'] = (int)$db->lastInsertId();
 				}
+				if(intval($_POST['id']) > 0 AND $_POST['permit'] != 1) {
+					sql('DELETE FROM users_collections WHERE id_user = ?', array(intval($_POST['id'])));
+					if(isset($_POST['user_collections']) AND is_array($_POST['user_collections'])) {
+						foreach($_POST['user_collections'] as $uc) {
+							sql('INSERT OR IGNORE INTO users_collections (id_user, id_collection) VALUES (?, ?)', array(intval($_POST['id']), intval($uc)));
+						}
+					}
+				}
+			}
+			$collections_select = '';
+			if($permit == '') {
+				$cols_for_select = sql('SELECT id, name FROM collections ORDER BY name', array())->fetchAll();
+				$collections_select = '<div class="mt-2"><label class="form-label">Collections accessibles (Ctrl+clic pour plusieurs) <span class="text-muted small">— les administrateurs voient tout</span></label><select name="user_collections[]" multiple size="6" class="form-select">';
+				foreach($cols_for_select as $ucol) {
+					$ucsel = (in_array((int)$ucol['id'], array_map('intval', (array)$user_collections))) ? ' selected' : '';
+					$collections_select .= '<option value="'.intval($ucol['id']).'"'.$ucsel.'>'.h($ucol['name']).'</option>';
+				}
+				$collections_select .= '</select></div>';
 			}
 			echo'<form method="post" action="?do=admin" class="d-print-none">
 			    '.csrf_field().'
@@ -852,8 +873,10 @@ echo '</form></div></div>';
 			    <label>Phrase de passe</label> <input type="password" name="pwd" class="form-control"/>
 			    <div class="form-check"><input type="checkbox" name="permit" class="form-check-input" '.$permit.'/><label class="form-check-label">Droits administrateur</label></div>
 			    <input type="hidden" name="id" value="'.intval($id).'"/>
+			   '.$collections_select.'
 			   <input type="submit" name="submit" value="Envoyer" class="btn btn-primary mb-3"/>
 			</form>';
+
 			
 			    echo '<table class="table">
 			            <tr><th>Utilisateurs</th><th>Permissions</th><th>Actions</th></tr>';
@@ -874,6 +897,7 @@ echo '</form></div></div>';
         case 'login':
            if(check(@$_SESSION['login'])) {
                 unset($_SESSION['login']);
+                unset($_SESSION['user_id']);
                 unset($_SESSION['permit']);
                 unset($_SESSION['token']);
                 session_destroy();
@@ -892,6 +916,7 @@ echo '</form></div></div>';
                     login_throttle_reset();
                     session_regenerate_id(true);
                     $_SESSION['login'] = true;
+                    $_SESSION['user_id'] = (int)$data['id'];
                     $_SESSION['permit'] = (int)$data['permit'];
                     $_SESSION['token'] = bin2hex(random_bytes(16));
                     redirect('index.php');
