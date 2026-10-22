@@ -5,6 +5,7 @@ include 'inc.php';
 <html>
 <head>
 <title>Presse</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
 <link href="vendor/twbs/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
 <script src="vendor/twbs/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
 <script src="vendor/nnnick/chartjs/dist/chart.umd.js" onerror="var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/chart.js@4';document.head.appendChild(s);"></script>
@@ -44,6 +45,10 @@ include 'inc.php';
 </head>
 <body class="container-fluid">
 <nav class="navbar navbar-expand-lg navbar-light bg-light d-print-none">
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain" aria-controls="navMain" aria-expanded="false" aria-label="Menu">
+        <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navMain">
     <ul class="navbar-nav">
       <li class="nav-item">
         <a class="nav-link" href="index.php"><i class="fa fa-database" aria-hidden="true"></i> Base de données</a>
@@ -90,6 +95,7 @@ while($col_nav = $collections_nav->fetch()):
         <a class="nav-link" href="index.php?do=login"><i class="fa fa-sign-in" aria-hidden="true"></i> <?php echo (!check(@$_SESSION['login'])) ? 'Connexion': 'Déconnexion'; ?></a>
       </li>
     </ul>
+    </div>
 </nav>
 <main>
 <?php
@@ -152,48 +158,71 @@ if(isset($_GET['do'])) {
 			        }
         	}
         	else {
+        		if(!isset($_GET['collection']) AND isset($_GET['idp'])) {$_GET['collection'] = $_GET['idp'];}
+        		if(isset($_GET['collection']) AND intval($_GET['collection']) > 0) {$_GET['idp'] = $_GET['collection'];}
         		$filter_cat = (isset($_GET['idp']) AND intval($_GET['idp']) > 0) ? ' WHERE id_collection='.intval($_GET['idp']): '';
 				$date_begin = (isset($_GET['date_begin'])) ? $_GET['date_begin'] : '1900-01-01';
 				$date_end = (isset($_GET['date_end'])) ? $_GET['date_end'] : date('Y-m-d', time());
-		        echo'<form method="get" class="d-print-none">
-		            <label>Collection</label>
-		            <select class="form-select" name="collection">';
-		                //$id_collection = (isset($_GET['idp'])) ? $_GET['idp'] : 0;
-		                $query = $db->query('SELECT * FROM collections ORDER BY id');
-		                while($data = $query->fetch()) {
-				            $selected = ((int)$data['id'] == (int)$_GET['idp']) ? 'selected' : '';
-				          	echo '<option value="'.$data['id'].'" '.$selected.'>'.$data['name'].'</option>';
-						}
-		            echo '</select>
-		            <label>Date de début</label><input type="date" name="date_begin" value="'.$date_begin.'" class="form-control" />
-		            <label>Date de fin</label><input type="date" name="date_end" value="'.$date_end.'" class="form-control" />
-		            <label>Journaux</label>       
-		            <select class="form-select" multiple aria-label="multiple select" name="journal[]">';
-		                    $journal = (isset($_GET['journal'])) ? $_GET['journal'] : array();
-		                    $query = $db->query('SELECT DISTINCT trim(journal) as journal FROM presse '.$filter_cat.' ORDER BY journal');
-		                    while($data = $query->fetch()) {
-				               	$selected = (in_array($data['journal'], $journal)) ? 'selected' : '';
-				          		echo '<option value="'.h($data['journal']).'" '.$selected.'>'.h($data['journal']).'</option>';
-		              		}
-		           echo ' </select>
-		            <label>Catégories</label>
-		            <select class="form-select" multiple aria-label="multiple select" name="category[]">';
-		                $category = (isset($_GET['category'])) ? $_GET['category'] : array();
-		                $query = $db->query('SELECT DISTINCT trim(category) as category FROM presse '.$filter_cat.' ORDER BY category');
-		                $data = $query->fetchAll(PDO::FETCH_COLUMN);
-		                foreach(tags($data) as $cat) {
-		                	$selected = (in_array($cat, $category)) ? 'selected' : '';
-		                	echo '<option value="'.$cat.'" '.$selected.'>'.$cat.'</option>';
-		                }
-		           
-		            echo '</select>
-		            <label>Mot-clé</label> <input type="search" name="search" class="form-control"/>
-		            <input type="hidden" name="do" value="view"/>
-		            <input type="hidden" name="idp" value="'.intval(@$_GET['idp']).'"/>
-		            <input type="submit" name="submit" value="Exécuter" class="btn btn-primary mb-3"/>
-		            <input type="submit" name="submit_file" value="Exporter" class="btn btn-primary mb-3"/>
-					<a href="?do=view&sort='.intval(@$_GET['idp']).'" class="btn btn-primary mb-3"><i class="fa fa-sort"></i> Trier</a>
-		            </form>';
+$active_collection = (isset($_GET['collection']) AND intval($_GET['collection']) > 0) ? intval($_GET['collection']) : ((isset($_GET['idp']) AND intval($_GET['idp']) > 0) ? intval($_GET['idp']) : 0);
+$active_badges = array();
+if($active_collection > 0) {
+	$cname = sql('SELECT name FROM collections WHERE id = ?', array($active_collection))->fetch();
+	$active_badges[] = array('key' => 'collection', 'label' => ($cname ? h($cname['name']) : '#'.$active_collection));
+}
+if(!empty($_GET['date_begin']) AND $_GET['date_begin'] != '1900-01-01') {$active_badges[] = array('key' => 'date_begin', 'label' => 'dès '.h($_GET['date_begin']));}
+if(!empty($_GET['date_end']) AND $_GET['date_end'] != date('Y-m-d')) {$active_badges[] = array('key' => 'date_end', 'label' => 'jusqu\'à '.h($_GET['date_end']));}
+foreach((array)@$_GET['journal'] as $j) {$active_badges[] = array('key' => 'journal', 'label' => h($j));}
+foreach((array)@$_GET['category'] as $c) {$active_badges[] = array('key' => 'category', 'label' => h($c));}
+if(!empty($_GET['search'])) {$active_badges[] = array('key' => 'search', 'label' => '« '.h($_GET['search']).' »');}
+
+echo '<div class="mb-3 d-print-none">';
+if(count($active_badges) > 0) {
+	echo '<p class="mb-1"><strong>Filtres actifs :</strong> ';
+	foreach($active_badges as $b) {echo '<span class="badge text-bg-secondary">'.$b['label'].'</span> ';}
+	echo '<a class="btn btn-sm btn-outline-secondary" href="index.php?do=view">Tout effacer</a>';
+	echo '</p>';
+}
+echo '<p>';
+echo '<a class="btn btn-outline-primary btn-sm" data-bs-toggle="collapse" href="#filterPanel" role="button" aria-expanded="false" aria-controls="filterPanel"><i class="fa fa-filter" aria-hidden="true"></i> Filtres</a> ';
+echo '<a class="btn btn-outline-primary btn-sm" href="?do=view&sort='.$active_collection.'"><i class="fa fa-sort" aria-hidden="true"></i> Trier</a>';
+echo '</p>';
+echo '<div class="collapse" id="filterPanel">';
+echo '<form method="get" class="card card-body bg-light">';
+echo '<input type="hidden" name="do" value="view"/>';
+echo '<div class="row g-2"><div class="col-md-4"><label class="form-label">Collection</label>';
+echo '<select class="form-select" name="collection">';
+$query = $db->query('SELECT * FROM collections ORDER BY name');
+echo '<option value="">Toutes</option>';
+while($data = $query->fetch()) {
+	$selected = ((int)$data['id'] === $active_collection) ? ' selected' : '';
+	echo '<option value="'.intval($data['id']).'"'.$selected.'>'.h($data['name']).'</option>';
+}
+echo '</select></div>';
+echo '<div class="col-md-4"><label class="form-label">Date de début</label><input type="date" name="date_begin" value="'.h($date_begin).'" class="form-control"/></div>';
+echo '<div class="col-md-4"><label class="form-label">Date de fin</label><input type="date" name="date_end" value="'.h($date_end).'" class="form-control"/></div>';
+echo '</div>';
+echo '<div class="row g-2 mt-1"><div class="col-md-6"><label class="form-label">Journaux</label>';
+echo '<select class="form-select" multiple size="5" aria-label="multiple select" name="journal[]">';
+$journal = (isset($_GET['journal'])) ? $_GET['journal'] : array();
+$query = $db->query('SELECT DISTINCT trim(journal) as journal FROM presse '.$filter_cat.' ORDER BY journal');
+while($data = $query->fetch()) {
+	$selected = (in_array($data['journal'], $journal)) ? 'selected' : '';
+	echo '<option value="'.h($data['journal']).'" '.$selected.'>'.h($data['journal']).'</option>';
+}
+echo ' </select></div>';
+echo '<div class="col-md-6"><label class="form-label">Catégories</label>';
+echo '<select class="form-select" multiple size="5" aria-label="multiple select" name="category[]">';
+$category = (isset($_GET['category'])) ? $_GET['category'] : array();
+foreach(categories_list(($active_collection > 0) ? $active_collection : null) as $cat) {
+	$selected = (in_array($cat, $category)) ? 'selected' : '';
+	echo '<option value="'.h($cat).'" '.$selected.'>'.h($cat).'</option>';
+}
+echo '</select></div></div>';
+echo '<div class="row g-2 mt-1 align-items-end"><div class="col-md"><label class="form-label">Mot-clé</label>';
+echo '<input type="search" name="search" value="'.h(@$_GET['search']).'" class="form-control"/></div>';
+echo '<div class="col-md-auto"><button type="submit" name="submit" value="1" class="btn btn-primary"><i class="fa fa-play" aria-hidden="true"></i> Exécuter</button> ';
+echo '<button type="submit" name="submit_file" value="1" class="btn btn-outline-primary"><i class="fa fa-download" aria-hidden="true"></i> Exporter</button></div></div>';
+echo '</form></div></div>';
 		    if(isset($_GET['submit']) OR isset($_GET['htmlview']) OR isset($_GET['submit_file'])) {
 		    	if(isset($_GET['htmlview'])) {
 		    		$_GET['collection'] = intval(@$_GET['idp']);
@@ -410,7 +439,9 @@ if(isset($_GET['do'])) {
 				</ul>
 				<div class="tab-content" id="myTabContent">
 				  <div class="tab-pane fade show active" id="html-tab-pane" role="tabpanel" aria-labelledby="html-tab" tabindex="0">'
-				  .'<p>'.$total_rows.' article(s) — page '.$current_page.'/'.$total_pages_display.' — trier par: '
+				  .'<p class="d-flex flex-wrap align-items-center gap-2"><span>'.$total_rows.' article(s) — page '.$current_page.'/'.$total_pages_display.'</span>'
+				  .'<button type="button" id="densityToggle" class="btn btn-sm btn-outline-secondary"><i class="fa fa-list" aria-hidden="true"></i> <span id="densityLabel">Vue détaillée</span></button>'
+				  .'<span class="ms-2">Trier par : </span>'
 				  .'<a class="btn btn-sm '.(($order_col=='date')?'btn-secondary':'btn-outline-secondary').'" href="'.h($sort_url.'&orderby=date&orderdir='.($order_col=='date'&&$order_dir=='ASC'?'desc':'asc')).'">Date</a> '
 				  .'<a class="btn btn-sm '.(($order_col=='journal')?'btn-secondary':'btn-outline-secondary').'" href="'.h($sort_url.'&orderby=journal&orderdir='.($order_col=='journal'&&$order_dir=='ASC'?'desc':'asc')).'">Journal</a> '
 				  .'<a class="btn btn-sm '.(($order_col=='title')?'btn-secondary':'btn-outline-secondary').'" href="'.h($sort_url.'&orderby=title&orderdir='.($order_col=='title'&&$order_dir=='ASC'?'desc':'asc')).'">Titre</a> '
@@ -866,5 +897,29 @@ document.querySelectorAll('a[data-ajax]').forEach(link => {
     });
 });
 </script>
+<script>
+(function() {
+    const KEY = 'pressdb-density';
+    const apply = function(mode) {
+        document.body.classList.toggle('density-compact', mode === 'compact');
+        document.querySelectorAll('details').forEach(d => {d.open = (mode !== 'compact');});
+        const label = document.getElementById('densityLabel');
+        if(label) {label.textContent = (mode === 'compact') ? 'Vue compacte' : 'Vue détaillée';}
+        localStorage.setItem(KEY, mode);
+    };
+    const saved = localStorage.getItem(KEY) || 'full';
+    if(saved === 'compact') {apply('compact');}
+    const btn = document.getElementById('densityToggle');
+    if(btn) {btn.addEventListener('click', function() {
+        apply(document.body.classList.contains('density-compact') ? 'full' : 'compact');
+    });}
+})();
+</script>
+<style>
+@media screen {
+    body.density-compact article .article-compact {display: none;}
+    body.density-compact article details {display: none;}
+}
+</style>
 </body>
 </html>

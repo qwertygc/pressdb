@@ -198,35 +198,33 @@ function badge($text) {
 	}
 	return '<span class="badge '.$color.'"><i class="fa fa-tags" aria-hidden="true"></i> '.h($text).'</span>';
 }            
- function show_article($array=array('id'=>'', 'date'=>'', 'journal'=>'', 'category'=>'', 'source'=>'', 'content'=>''), $details=false, $bulk=false) {
-	global $_POST;
+  function show_article($array=array('id'=>'', 'date'=>'', 'journal'=>'', 'category'=>'', 'source'=>'', 'content'=>''), $details=false, $bulk=false) {
  	global $db;
  	$filter_cat = (isset($_GET['idp']) AND intval($_GET['idp']) > 0) ? ' WHERE id_collection='.intval($_GET['idp']): '';
-	$return = '<article>
-		    <header>
-		    '.(($bulk AND is_logged()) ? '<input type="checkbox" name="bulk_ids[]" value="'.intval($array['id']).'"/> ' : '').'<h1><a href="index.php?do=view&article='.intval($array['id']).'"><i class="fa fa-link" aria-hidden="true"></i></a> '.h($array['title']).'</h1>
-		    <aside>
-		    <div class="d-print-none">';
-        if(!is_logged()) {
-        }
-        else {
-        	$tags = '<div class="btn-group">
-				  <button type="button" class="btn btn-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-					<i class="fa fa-tags" aria-hidden="true"></i> Assigner une catégorie
-				  </button>
-				  <ul class="dropdown-menu">';
-					 foreach(categories_list((isset($_GET['idp']) AND intval($_GET['idp']) > 0) ? intval($_GET['idp']) : null) as $cat) {
-							$tags .= '<li><a class="dropdown-item" href="api.php?do=update-category&id='.intval($array['id']).'&category='.urlencode($cat).'&token='.h($_SESSION['token']).'&idp='.intval(@$_GET['idp']).'" data-ajax="true">'.h($cat).'</a></li>';
-					 }
-					$tags .='</ul></div>';
-				$return .= '<a href="?do=add&id='.intval($array['id']).'" class="btn btn-primary" target="_blank"><i class="fa fa-pencil" aria-hidden="true"></i> Éditer</a>
-				<a  href="api.php?do=delete-entry&delete='.intval($array['id']).'&token='.h($_SESSION['token']).'&idp='.intval(@$_GET['idp']).'" class="btn btn-danger"  onclick="return confirm(\'Êtes-vous sûr ?\');" data-ajax="true"><i class="fa fa-trash" aria-hidden="true"></i> Supprimer</a>
-			'.$tags.'';
+	$id = intval($array['id']);
+	$return = '<article class="border rounded p-2 mb-2">
+	    <header class="d-flex flex-wrap align-items-start gap-2">
+	    '.(($bulk AND is_logged()) ? '<input type="checkbox" name="bulk_ids[]" value="'.$id.'" aria-label="Sélectionner"/> ' : '').'<h2 class="h6 flex-grow-1 mb-0"><a href="index.php?do=view&article='.$id.'"><i class="fa fa-link" aria-hidden="true"></i></a> '.h($array['title']).'</h2>';
+        if(is_logged()) {
+        	$tags = '<li class="dropdown-header">Assigner une catégorie</li>';
+			 foreach(categories_list((isset($_GET['idp']) AND intval($_GET['idp']) > 0) ? intval($_GET['idp']) : null) as $cat) {
+					$tags .= '<li><a class="dropdown-item" href="api.php?do=update-category&id='.$id.'&category='.urlencode($cat).'&token='.h($_SESSION['token']).'&idp='.intval(@$_GET['idp']).'" data-ajax="true">'.h($cat).'</a></li>';
+			 }
+			$return .= '<div class="dropdown d-print-none">
+				<button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Actions"><i class="fa fa-ellipsis-h" aria-hidden="true"></i></button>
+				<ul class="dropdown-menu">
+				<li><a class="dropdown-item" href="?do=add&id='.$id.'"><i class="fa fa-pencil" aria-hidden="true"></i> Éditer</a></li>
+				<li><hr class="dropdown-divider"/></li>
+				'.$tags.'
+				<li><hr class="dropdown-divider"/></li>
+				<li><a class="dropdown-item text-danger" href="api.php?do=delete-entry&delete='.$id.'&token='.h($_SESSION['token']).'&idp='.intval(@$_GET['idp']).'" onclick="return confirm(\'Êtes-vous sûr ?\');" data-ajax="true"><i class="fa fa-trash" aria-hidden="true"></i> Supprimer</a></li>
+				</ul>
+			</div>';
 		}
-	    $return .='<p><i class="fa fa-calendar" aria-hidden="true"></i> <time>'.h($array['date']).'</time> ⋅ <i class="fa fa-newspaper-o" aria-hidden="true"></i> '.h($array['journal']).' ⋅ '.badge($array['category']).' ⋅ <i class="fa fa-link" aria-hidden="true"></i> '.beautiful_url($array['source']).' ⋅ '.str_word_count((string)$array['content'],0).' mots</p>
-		    </aside>
-		    </header>
-		    <main>';
+	    $return .='</header>
+	    <p class="mb-1 mt-1 small text-muted"><i class="fa fa-calendar" aria-hidden="true"></i> <time>'.h($array['date']).'</time> ⋅ <i class="fa fa-newspaper-o" aria-hidden="true"></i> '.h($array['journal']).' ⋅ '.badge($array['category']).' ⋅ <i class="fa fa-link" aria-hidden="true"></i> '.beautiful_url($array['source']).' ⋅ '.str_word_count((string)$array['content'],0).' mots</p>';
+	    $main_class = ($details == true) ? 'article-full' : 'article-compact';
+	    $return .= '<main class="'.$main_class.'">';
 		$return .= ($details == false) ? nl2br(h($array['content'])) : '<details><summary>Développer</summary>'.nl2br(h($array['content'])).'</details>';
 		$return .= '   </main>
 		</article>';
