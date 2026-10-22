@@ -1,9 +1,10 @@
 {
     "require": {
+        "forkawesome/fork-awesome": "^1.2",
         "j0k3r/graby": "^2.4",
+        "nnnick/chartjs": "^4.4",
         "php-http/guzzle7-adapter": "^1.0",
         "twbs/bootstrap": "^5.3",
-        "forkawesome/fork-awesome": "^1.2",
         "voku/simple_html_dom": "^4.8"
     },
     "config": {
