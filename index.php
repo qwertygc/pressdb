@@ -7,6 +7,7 @@ include 'inc.php';
 <title>Presse</title>
 <link href="vendor/twbs/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
 <script src="vendor/twbs/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+<script src="vendor/nnnick/chartjs/dist/chart.umd.js" onerror="var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/chart.js@4';document.head.appendChild(s);"></script>
 <link rel="stylesheet" href="vendor/forkawesome/fork-awesome/css/fork-awesome.min.css">
     <style>
 @media screen {
@@ -439,7 +440,8 @@ if(isset($_GET['do'])) {
 	            <label>Journal</label>       
 	            <input type="text" name="journal" list="journal" value="'.h($journal).'" class="form-control"/>
 	            <datalist id="journal">';
-	              $query = $db->query('SELECT DISTINCT lower(trim(journal)) as journal FROM presse ORDER BY journal');
+	              $add_col = (isset($id_collection)) ? ' WHERE id_collection='.intval($id_collection) : '';
+	              $query = $db->query('SELECT DISTINCT lower(trim(journal)) as journal FROM presse'.$add_col.' ORDER BY journal');
 	              while($data = $query->fetch()) {
 	              	echo '<option value="'.h($data['journal']).'" />';
 	              }
@@ -447,7 +449,7 @@ if(isset($_GET['do'])) {
 	            <label>Catégorie</label>
 	            <input type="text" name="category" list="category" value="'.h($category).'" class="form-control"/>
 	            <datalist id="category">';
-	             $query = $db->query('SELECT DISTINCT lower(trim(category)) as category FROM presse ORDER BY category');
+	             $query = $db->query('SELECT DISTINCT lower(trim(category)) as category FROM presse'.$add_col.' ORDER BY category');
 	             $data = $query->fetchAll(PDO::FETCH_COLUMN);
                 foreach(tags($data) as $cat) {
                 	echo '<option value="'.h($cat).'">'.h($cat).'</option>';

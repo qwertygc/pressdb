@@ -74,15 +74,21 @@ function europresse2standardtime($str) {
 		);
 }
 
+function chart_counter() {
+    static $n = 0;
+    $n++;
+    return 'chart'.$n;
+}
 function quickchart($type, $labels=array('Q1', 'Q2', 'Q3', 'Q4'), $ds=array(array('label'=>'Dogs', 'data'=>array(1, 2, 3, 4)))) {
-    $quickchart = [
+    $config = [
         'type' => $type,
         'data' => [
             'labels' => $labels,
             'datasets' => $ds
         ]
     ];
-    return '<img src="https://quickchart.io/chart?c='.urlencode(json_encode($quickchart)).'" alt="chart"/>';
+    $id = chart_counter();
+    return '<canvas id="'.$id.'"></canvas><script>new Chart(document.getElementById("'.$id.'"), '.json_encode($config).');</script>';
 }
 function beautiful_url($url) {
 	if(filter_var($url, FILTER_VALIDATE_URL)) {
