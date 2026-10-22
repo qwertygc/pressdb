@@ -9,7 +9,7 @@ elseif(isset($_GET['do'])) {
 	switch($_GET['do']) {
 		case 'update-category':
 			if(isset($_GET['id']) AND isset($_GET['category']) AND csrf_ok('GET')) {
-				sql('UPDATE presse SET category = ? WHERE id=?', array($_GET['category'], intval($_GET['id'])));
+				article_set_categories(intval($_GET['id']), array($_GET['category']));
 				$response = ['success' => true, 'message' => 'Catégorie mise à jour'];
 			}
 			else {

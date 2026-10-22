@@ -198,16 +198,15 @@ if(isset($_GET['do'])) {
 
 		        $categories = '';
 		        if(isset($_GET['category']) AND is_array($_GET['category']) AND count($_GET['category']) > 0) {
-		            $categories .= 'AND (';
+		            $categories .= 'AND id IN (SELECT id_presse FROM presse_categories pc JOIN categories c ON c.id = pc.id_category WHERE c.name IN (';
+		            $first = true;
 		            foreach($_GET['category'] as $category) {
-		            	$cat_array = explode(" ", $category);
-		            	foreach($cat_array as $cat) {
-		                	$categories .= ' category LIKE ? OR ';
-		                	$params[] = '%'.$cat.'%';
-		                }
+		            	if(!$first) {$categories .= ', ';}
+		            	$categories .= '?';
+		            	$params[] = trim($category);
+		            	$first = false;
 		            }
-		            $categories = substr($categories, 0, -4);
-		            $categories .=')';
+		            $categories .= '))';
 		        }
 		        $search = '';
 		        if(isset($_GET['search']) AND $_GET['search'] != '') {
@@ -413,13 +412,19 @@ if(isset($_GET['do'])) {
 
 	        if (isset($_POST['content']) AND csrf_ok('POST')) {
 	            echo "Ajout dans la base de données";
-	            //si id_member = 0 on insert sinon on update
-	            if (intval($_POST['id']) == 0) {
-	                sql('INSERT INTO presse (date, journal, category, title, content, source, id_collection) VALUES (?, ?, ?, ?, ?, ?, ?)', array($_POST['date'], $_POST['journal'],$_POST['category'],$_POST['title'],$_POST['content'], $_POST['source'], intval($_POST['collection'])));
+	            $new_id = intval($_POST['id']);
+	            if ($new_id == 0) {
+	                sql('INSERT INTO presse (date, journal, category, title, content, source, id_collection) VALUES (?, ?, ?, ?, ?, ?, ?)', array($_POST['date'], $_POST['journal'], '', $_POST['title'], $_POST['content'], $_POST['source'], intval($_POST['collection'])));
+	                $new_id = (int)$db->lastInsertId();
 	            } else {
-	                sql('UPDATE presse SET date = ?, journal = ?, category = ?, title=?, content = ?, source = ?, id_collection=? WHERE id=?', array($_POST['date'], $_POST['journal'], $_POST['category'], $_POST['title'], $_POST['content'], $_POST['source'], intval($_POST['collection']), intval($_POST['id'])));
+	                sql('UPDATE presse SET date = ?, journal = ?, title=?, content = ?, source = ?, id_collection=? WHERE id=?', array($_POST['date'], $_POST['journal'], $_POST['title'], $_POST['content'], $_POST['source'], intval($_POST['collection']), $new_id));
 	            }
-	            redirect('index.php?do=view&article='.intval($_POST['id']));
+	            $cats = (isset($_POST['category']) AND is_array($_POST['category'])) ? $_POST['category'] : array();
+	            if(isset($_POST['category_new']) AND trim($_POST['category_new']) !== '') {
+		            $cats = array_merge($cats, explode(' ', $_POST['category_new']));
+	            }
+	            article_set_categories($new_id, $cats);
+	            redirect('index.php?do=view&article='.$new_id);
 	        }
 	    echo '<form method="post" action="?do=add" class="d-print-none">
 	       '.csrf_field().'
@@ -450,15 +455,16 @@ if(isset($_GET['do'])) {
 	              	echo '<option value="'.h($data['journal']).'" />';
 	              }
 	            echo '</datalist>
-	            <label>Catégorie</label>
-	            <input type="text" name="category" list="category" value="'.h($category).'" class="form-control"/>
-	            <datalist id="category">';
-	             $query = $db->query('SELECT DISTINCT lower(trim(category)) as category FROM presse'.$add_col.' ORDER BY category');
-	             $data = $query->fetchAll(PDO::FETCH_COLUMN);
-                foreach(tags($data) as $cat) {
-                	echo '<option value="'.h($cat).'">'.h($cat).'</option>';
-                }
-	           echo '</datalist>
+	            <label>Catégories (Ctrl+clic pour en sélectionner plusieurs)</label>
+	            <select name="category[]" multiple class="form-control">';
+	             $current_cats = article_categories((int)$id);
+	             foreach(categories_list(null) as $cat) {
+	             	$selected = (in_array($cat, $current_cats)) ? 'selected' : '';
+	             	echo '<option value="'.h($cat).'" '.$selected.'>'.h($cat).'</option>';
+	             }
+	           echo '</select>
+	            <label>Nouvelle catégorie (optionnel, séparée par des espaces)</label>
+	            <input type="text" name="category_new" value="" class="form-control"/>
 	            <input type="hidden" name="id" id="id" value="'.intval($id).'"/>
 	            <input type="submit" name="submit" value="Envoyer" class="btn btn-primary mb-3"/>
 	            </form>';
@@ -499,11 +505,10 @@ if(isset($_GET['do'])) {
 	        <label for="category">Catégories</label>
 	        <select class="form-select" multiple aria-label="multiple select" name="category[]" style="height:50em">';
 		                    $category = (isset($_POST['category'])) ? $_POST['category'] : array();
-		                    $query = $db->query('SELECT DISTINCT trim(category) as category FROM presse '.$idp.' ORDER BY category');
-				            $data = $query->fetchAll(PDO::FETCH_COLUMN);
-				            foreach(tags($data) as $cat) {
-				            	echo '<option value="'.h($cat).'">'.h($cat).'</option>';
-				            }
+		                    foreach(categories_list(isset($_GET['idp']) ? intval($_GET['idp']) : null) as $cat) {
+			            	$selected = (in_array($cat, $category)) ? 'selected' : '';
+			            	echo '<option value="'+Q+'.h($cat)+'+Q+'" '+Q+'.$selected.'+Q+'>'+Q+'.h($cat)+'+Q+'</option>';
+			            }
 		                
 		    echo ' </select>
 		    <label for="newname_category">Nouveau nom</label>
@@ -513,9 +518,9 @@ if(isset($_GET['do'])) {
 	        if(isset($_POST['newname_category']) AND $_POST['newname_category'] != '' AND csrf_ok('POST')) {
 				 if(isset($_POST['category'])) {
 				        foreach($_POST['category'] as $category) {
-				        	//sql("UPDATE presse SET category =REPLACE(category, '".$category."', '".$_POST['newname_category']."') WHERE category LIKE '%$category%'");
-				           sql('UPDATE presse SET category = REPLACE(category, :old, :new) WHERE category LIKE :like', array('old'=>$category, 'new'=>$_POST['newname_category'], 'like'=>'%'.$category.'%'));
+				           sql('UPDATE categories SET name = :new WHERE name = :old', array('old'=>$category, 'new'=>$_POST['newname_category']));
 				        }
+				        sql('UPDATE presse SET category = (SELECT GROUP_CONCAT(c.name, \' \') FROM presse_categories pc JOIN categories c ON c.id = pc.id_category WHERE pc.id_presse = presse.id GROUP BY pc.id_presse)', array());
 				    }
 				redirect('index.php?do=tools');
 		     }
@@ -568,6 +573,7 @@ if(isset($_GET['do'])) {
 								if($data['3'] != 'journal') {
 									$category = ($data['4'] == '') ? 'à_trier' : $data['4'];
 									sql('INSERT INTO presse (date, journal, title, content, source, category, id_collection) VALUES (?,  ?, ?, ?, ?, ?, ?)', array($data['0'], $data['3'],$data['5'],$data['6'],$data['7'], $category, intval($_POST['collection'])));
+									article_set_categories((int)$db->lastInsertId(), array($category));
 								}
 							}
 							fclose($handle);
@@ -586,6 +592,7 @@ if(isset($_GET['do'])) {
 							$content = (string)$article->find('.docOcurrContainer')->plaintext[0];
 							sql('INSERT INTO presse (date, journal, title, content, source, category, id_collection) VALUES (?,  ?, ?, ?, ?, ?, ?)',
 							array($date, $journal_str,$title,$content,'Europresse', 'à_trier', intval($_POST['collection'])));
+							article_set_categories((int)$db->lastInsertId(), array('à_trier'));
 						}
 			        }
 			        else {
