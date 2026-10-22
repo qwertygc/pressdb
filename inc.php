@@ -201,7 +201,7 @@ function badge($text) {
  function show_article($array=array('id'=>'', 'date'=>'', 'journal'=>'', 'category'=>'', 'source'=>'', 'content'=>''), $details=false, $bulk=false) {
 	global $_POST;
  	global $db;
- 	$filter_cat = (isset($_GET['idp'])) ? ' WHERE id_collection='.intval($_GET['idp']): '';
+ 	$filter_cat = (isset($_GET['idp']) AND intval($_GET['idp']) > 0) ? ' WHERE id_collection='.intval($_GET['idp']): '';
 	$return = '<article>
 		    <header>
 		    '.(($bulk AND is_logged()) ? '<input type="checkbox" name="bulk_ids[]" value="'.intval($array['id']).'"/> ' : '').'<h1><a href="index.php?do=view&article='.intval($array['id']).'"><i class="fa fa-link" aria-hidden="true"></i></a> '.h($array['title']).'</h1>
@@ -215,7 +215,7 @@ function badge($text) {
 					<i class="fa fa-tags" aria-hidden="true"></i> Assigner une catégorie
 				  </button>
 				  <ul class="dropdown-menu">';
-					 foreach(categories_list(isset($_GET['idp']) ? intval($_GET['idp']) : null) as $cat) {
+					 foreach(categories_list((isset($_GET['idp']) AND intval($_GET['idp']) > 0) ? intval($_GET['idp']) : null) as $cat) {
 							$tags .= '<li><a class="dropdown-item" href="api.php?do=update-category&id='.intval($array['id']).'&category='.urlencode($cat).'&token='.h($_SESSION['token']).'&idp='.intval(@$_GET['idp']).'" data-ajax="true">'.h($cat).'</a></li>';
 					 }
 					$tags .='</ul></div>';

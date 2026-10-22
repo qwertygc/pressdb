@@ -152,7 +152,7 @@ if(isset($_GET['do'])) {
 			        }
         	}
         	else {
-        		$filter_cat = (isset($_GET['idp'])) ? ' WHERE id_collection='.$_GET['idp']: '';
+        		$filter_cat = (isset($_GET['idp']) AND intval($_GET['idp']) > 0) ? ' WHERE id_collection='.intval($_GET['idp']): '';
 				$date_begin = (isset($_GET['date_begin'])) ? $_GET['date_begin'] : '1900-01-01';
 				$date_end = (isset($_GET['date_end'])) ? $_GET['date_end'] : date('Y-m-d', time());
 		        echo'<form method="get" class="d-print-none">
@@ -189,10 +189,10 @@ if(isset($_GET['do'])) {
 		            echo '</select>
 		            <label>Mot-clé</label> <input type="search" name="search" class="form-control"/>
 		            <input type="hidden" name="do" value="view"/>
-		            <input type="hidden" name="idp" value="'.$_GET['idp'].'"/>
+		            <input type="hidden" name="idp" value="'.intval(@$_GET['idp']).'"/>
 		            <input type="submit" name="submit" value="Exécuter" class="btn btn-primary mb-3"/>
 		            <input type="submit" name="submit_file" value="Exporter" class="btn btn-primary mb-3"/>
-					<a href="?do=view&sort='.$_GET['idp'].'" class="btn btn-primary mb-3"><i class="fa fa-sort"></i> Trier</a>
+					<a href="?do=view&sort='.intval(@$_GET['idp']).'" class="btn btn-primary mb-3"><i class="fa fa-sort"></i> Trier</a>
 		            </form>';
 		    if(isset($_GET['submit']) OR isset($_GET['htmlview']) OR isset($_GET['submit_file'])) {
 		    	if(isset($_GET['htmlview'])) {
@@ -582,7 +582,7 @@ if(isset($_GET['do'])) {
 	        <label for="category">Catégories</label>
 	        <select class="form-select" multiple aria-label="multiple select" name="category[]" style="height:50em">';
 		                    $category = (isset($_POST['category'])) ? $_POST['category'] : array();
-		                    foreach(categories_list(isset($_GET['idp']) ? intval($_GET['idp']) : null) as $cat) {
+		                    foreach(categories_list((isset($_GET['idp']) AND intval($_GET['idp']) > 0) ? intval($_GET['idp']) : null) as $cat) {
 			            	$selected = (in_array($cat, $category)) ? 'selected' : '';
 			            	echo '<option value="'+Q+'.h($cat)+'+Q+'" '+Q+'.$selected.'+Q+'>'+Q+'.h($cat)+'+Q+'</option>';
 			            }
@@ -718,7 +718,7 @@ if(isset($_GET['do'])) {
 			echo'<form method="post" action="?do=import" enctype="multipart/form-data" class="d-print-none">
 			    <label>Collection</label>
 			    <select class="form-select" name="collection">';
-			        $id_collection = (isset($_GET['idp'])) ? $_GET['idp'] : 0;
+			        $id_collection = (isset($_GET['idp'])) ? intval($_GET['idp']) : 0;
 			        $query = $db->query('SELECT * FROM collections ORDER BY id');
 			        while($data = $query->fetch()) {
 			        	$selected = ((int)$data['id'] == (int)$id_collection) ? 'selected' : '';
