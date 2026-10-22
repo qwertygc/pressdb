@@ -182,6 +182,7 @@ if(count($active_badges) > 0) {
 	echo '<a class="btn btn-sm btn-outline-secondary" href="index.php?do=view">Tout effacer</a>';
 	echo '</p>';
 }
+echo '<p class="mb-1"><a class="btn btn-primary" data-bs-toggle="collapse" href="#filterPanel" role="button" aria-expanded="false" aria-controls="filterPanel"><i class="fa fa-filter" aria-hidden="true"></i> Filtrer / Afficher le corpus</a></p>';
 echo '<div class="collapse" id="filterPanel">';
 echo '<form method="get" class="card card-body bg-light">';
 echo '<input type="hidden" name="do" value="view"/>';
@@ -219,7 +220,7 @@ echo '<input type="search" name="search" value="'.h(@$_GET['search']).'" class="
 echo '<div class="col-md-auto"><button type="submit" name="submit" value="1" class="btn btn-primary"><i class="fa fa-play" aria-hidden="true"></i> Exécuter</button> ';
 echo '<button type="submit" name="submit_file" value="1" class="btn btn-outline-primary"><i class="fa fa-download" aria-hidden="true"></i> Exporter</button></div></div>';
 echo '</form></div></div>';
-		    if(isset($_GET['submit']) OR isset($_GET['htmlview']) OR isset($_GET['submit_file'])) {
+		    {
 		    	if(isset($_GET['htmlview'])) {
 		    		$_GET['collection'] = intval(@$_GET['idp']);
 		    	}
@@ -257,8 +258,8 @@ echo '</form></div></div>';
 		            $params[] = '%'.no_accents($_GET['search']).'%';
 		            $params[] = '%'.no_accents($_GET['search']).'%';
 		        }
-		        $collection = (($period != '') ? 'AND ' : '').'id_collection=?';
-		        $params[] = intval(@$_GET['collection']);
+		        $collection = ((intval(@$_GET['collection']) > 0) ? ((trim($period.' '.$journaux.' '.$categories.' '.$search) != '') ? 'AND ' : '').'id_collection=?' : '');
+		        if(intval(@$_GET['collection']) > 0) {$params[] = intval($_GET['collection']);}
 		        $sortable = array('date' => 'date', 'journal' => 'journal', 'title' => 'title');
 		        $order_col = (isset($_GET['orderby']) AND isset($sortable[$_GET['orderby']])) ? $sortable[$_GET['orderby']] : 'date';
 		        $order_dir = (isset($_GET['orderdir']) AND strtolower($_GET['orderdir']) === 'desc') ? 'DESC' : 'ASC';
