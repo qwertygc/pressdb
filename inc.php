@@ -15,6 +15,23 @@ function sql($query='', $values=array()) {
     $query->execute($values);
     return $query;
 }
+function no_accents($str) {
+	$converted = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', (string)$str);
+	if($converted === false) {return strtolower((string)$str);}
+	return strtolower($converted);
+}
+function paginate_links($base_url, $current_page, $per_page, $total) {
+	$pages = (int)ceil($total / $per_page);
+	if($pages <= 1) {return '';}
+	$out = '<nav><ul class="pagination">';
+	for($p = 1; $p <= $pages; $p++) {
+		$active = ($p == $current_page) ? ' active' : '';
+		$sep = (strpos($base_url, '?') === false) ? '?' : '&';
+		$out .= '<li class="page-item'.$active.'"><a class="page-link" href="'.h($base_url.$sep.'page='.$p).'">'.$p.'</a></li>';
+	}
+	return $out.'</ul></nav>';
+}
+
 function h($str) {
 	return htmlspecialchars((string)$str, ENT_QUOTES, 'UTF-8');
 }
@@ -181,12 +198,13 @@ function badge($text) {
 	}
 	return '<span class="badge '.$color.'"><i class="fa fa-tags" aria-hidden="true"></i> '.h($text).'</span>';
 }            
- function show_article($array=array('id'=>'', 'date'=>'', 'journal'=>'', 'category'=>'', 'source'=>'', 'content'=>''), $details=false) {
+ function show_article($array=array('id'=>'', 'date'=>'', 'journal'=>'', 'category'=>'', 'source'=>'', 'content'=>''), $details=false, $bulk=false) {
+	global $_POST;
  	global $db;
  	$filter_cat = (isset($_GET['idp'])) ? ' WHERE id_collection='.intval($_GET['idp']): '';
 	$return = '<article>
 		    <header>
-		    <h1><a href="index.php?do=view&article='.intval($array['id']).'"><i class="fa fa-link" aria-hidden="true"></i></a> '.h($array['title']).'</h1>
+		    '.(($bulk AND is_logged()) ? '<input type="checkbox" name="bulk_ids[]" value="'.intval($array['id']).'"/> ' : '').'<h1><a href="index.php?do=view&article='.intval($array['id']).'"><i class="fa fa-link" aria-hidden="true"></i></a> '.h($array['title']).'</h1>
 		    <aside>
 		    <div class="d-print-none">';
         if(!is_logged()) {
