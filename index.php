@@ -243,6 +243,7 @@ if(isset($_GET['do'])) {
 		        $total_rows = (int)sql($sql_count, $params)->fetch()['total'];
 		        $offset = ($current_page - 1) * $per_page;
 		        $sql = 'SELECT * FROM presse WHERE '.$period.' '.$journaux.' '.$categories.' '.$search.' '.$collection.' ORDER BY '.$order_col.' '.$order_dir.' LIMIT '.$per_page.' OFFSET '.$offset.' ';
+		        $export_sql = 'SELECT * FROM presse WHERE '.$period.' '.$journaux.' '.$categories.' '.$search.' '.$collection.' ORDER BY '.$order_col.' '.$order_dir.' ';
 		        if(isset($_POST['bulk_action']) AND is_logged() AND csrf_ok('POST')) {
 		        	$ids = (isset($_POST['bulk_ids']) AND is_array($_POST['bulk_ids'])) ? array_map('intval', $_POST['bulk_ids']) : array();
 		        	$ids = array_filter($ids);
