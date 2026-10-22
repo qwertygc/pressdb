@@ -520,7 +520,7 @@ if(isset($_GET['do'])) {
 				        foreach($_POST['category'] as $category) {
 				           sql('UPDATE categories SET name = :new WHERE name = :old', array('old'=>$category, 'new'=>$_POST['newname_category']));
 				        }
-				        sql('UPDATE presse SET category = (SELECT GROUP_CONCAT(c.name, ' ') FROM presse_categories pc JOIN categories c ON c.id = pc.id_category WHERE pc.id_presse = presse.id GROUP BY pc.id_presse)', array());
+				        sql('UPDATE presse SET category = (SELECT GROUP_CONCAT(c.name, \' \') FROM presse_categories pc JOIN categories c ON c.id = pc.id_category WHERE pc.id_presse = presse.id GROUP BY pc.id_presse)', array());
 				    }
 				redirect('index.php?do=tools');
 		     }
