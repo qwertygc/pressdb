@@ -131,7 +131,7 @@ if(isset($_GET['do'])) {
                     <tr><th>Collections</th><th>Actions</th></tr>';
             $query = $db->query('SELECT c.*, (SELECT COUNT(*) FROM presse p WHERE p.id_collection = c.id AND p.category = ?) as a_trier FROM collections c ORDER BY c.id', array('à_trier'));
             while($data = $query->fetch()) {
-                echo '<tr><td><a href="?do=view&idp='.intval($data['id']).'">'.h($data['name']).'</a> '.((intval($data['public']) === 1) ? '<span class="badge text-bg-success">public</span>' : '<span class="badge text-bg-secondary">priv'.'ée</span>').((intval($data['a_trier']) > 0) ? ' <span class="badge text-bg-warning">'.intval($data['a_trier']).' '.' à trier'</span>' : '').'</td>
+                echo '<tr><td><a href="?do=view&idp='.intval($data['id']).'">'.h($data['name']).'</a> '.((intval($data['public']) === 1) ? '<span class="badge text-bg-success">public</span>' : '<span class="badge text-bg-secondary">priv'.'ée</span>').((intval($data['a_trier']) > 0) ? ' <span class="badge text-bg-warning">'.intval($data['a_trier']).' '.' à trier'.</span>' : '').'</td>
                     <td>
                     <form method="post" action="?do=collections" style="display:inline">'.csrf_field().'<input type="hidden" name="toggle_public" value="'.intval($data['id']).'"/><button type="submit" class="btn btn-sm btn-outline-secondary" title="Basculer public/priv'.'ée"><i class="fa fa-eye'.((intval($data['public']) === 1) ? '' : '-slash').'" aria-hidden="true"></i></button></form>
                     <div class="btn-group" role="group" aria-label="Basic example">
