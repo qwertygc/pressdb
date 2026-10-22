@@ -106,7 +106,7 @@ if(isset($_GET['do'])) {
                         <a href="?do=view&sort='.intval($data['id']).'" class="btn btn-primary btn-sm"><i class="fa fa-sort"></i> Trier</a>
                         <a href="?do=add&idp='.intval($data['id']).'" class="btn btn-primary btn-sm"><i class="fa fa-pencil" aria-hidden="true"></i> Ajouter un article</a>
                         <a href="?do=tools&idp='.intval($data['id']).'" class="btn btn-primary btn-sm"><i class="fa fa-wrench" aria-hidden="true"></i> Configurer</a>
-                        <a href="?do=collections&delete='.intval($data['id']).'&token='.h($_SESSION['token']).'" class="btn btn-danger btn-sm" onclick="return confirm(\'Êtes-vous sûr ?\');"><i class="fa fa-trash" aria-hidden="true"></i> Supprimer</a>
+                        <form method="post" action="?do=collections" style="display:inline" onsubmit="return confirm(\'Êtes-vous sûr ?\');">'.csrf_field().'<input type="hidden" name="delete" value="'.intval($data['id']).'"/><button type="submit" class="btn btn-danger btn-sm"><i class="fa fa-trash" aria-hidden="true"></i> Supprimer</button></form>
                     </div>
                     </td>
                 </tr>';
@@ -331,11 +331,11 @@ if(isset($_GET['do'])) {
 		           //redirect('data/export/'.$filename.'.zip');
 		            
 		            echo '
-		            <a href="data/export/'.$filename.'/export-'.$filename.'.zip" class="btn btn-primary"><i class="fa fa-file-archive-o" aria-hidden="true"></i> Archive (zip)</a> 
-		            <a href="data/export/'.$filename.'/query.txt" class="btn btn-primary"><i class="fa fa-database" aria-hidden="true"></i> Requête SQL</a> 
-		            <a href="data/export/'.$filename.'/presse_iramuteq.txt" class="btn btn-primary"><i class="fa fa-download" aria-hidden="true"></i> Fichier Iramuteq</a> 
-		            <a href="data/export/'.$filename.'/presse.csv" class="btn btn-primary"><i class="fa fa-download" aria-hidden="true"></i> Fichier CSV</a> 
-		            <a href="data/export/'.$filename.'/presse_raw.txt" class="btn btn-primary"><i class="fa fa-download" aria-hidden="true"></i> Texte brut</a>';
+		            <a href="api.php?do=export-file&dir='.$filename.'&file=export-'.$filename.'.zip&token='.h($_SESSION['token']).'" class="btn btn-primary"><i class="fa fa-file-archive-o" aria-hidden="true"></i> Archive (zip)</a> 
+		            <a href="api.php?do=export-file&dir='.$filename.'&file=query.txt&token='.h($_SESSION['token']).'" class="btn btn-primary"><i class="fa fa-database" aria-hidden="true"></i> Requête SQL</a> 
+		            <a href="api.php?do=export-file&dir='.$filename.'&file=presse_iramuteq.txt&token='.h($_SESSION['token']).'" class="btn btn-primary"><i class="fa fa-download" aria-hidden="true"></i> Fichier Iramuteq</a> 
+		            <a href="api.php?do=export-file&dir='.$filename.'&file=presse.csv&token='.h($_SESSION['token']).'" class="btn btn-primary"><i class="fa fa-download" aria-hidden="true"></i> Fichier CSV</a> 
+		            <a href="api.php?do=export-file&dir='.$filename.'&file=presse_raw.txt&token='.h($_SESSION['token']).'" class="btn btn-primary"><i class="fa fa-download" aria-hidden="true"></i> Texte brut</a>';
 		            
 		        }
 		        else {
@@ -370,6 +370,10 @@ if(isset($_GET['do'])) {
 	            $source = $data['source'];
 	            $id_collection = $data['id_collection'];
 	            $id = $_GET['id'];
+	        }
+	        elseif(isset($_POST['quick']) AND !url_allowed($_POST['quick'])) {
+	            echo '<div class="alert alert-warning" role="alert">URL non autorisée</div>';
+	            $date = date('Y-m-d', time()); $journal = ''; $category = ''; $title = ''; $content = ''; $source = ''; $id_collection = 0; $id = 0;
 	        }
 	        elseif(isset($_POST['quick'])) {
 	            /*
@@ -525,18 +529,25 @@ if(isset($_GET['do'])) {
 		      		echo '<li>'.h($data['title']).'('.intval($data['nbr_doublon']).')</li>';
 		  		}
 		  		echo '</ol>';
-		  		echo '<a href="?do=tools&delete_doublon=yes&id_collection='.intval($collections['id']).'&token='.h($_SESSION['token']).'" class="btn btn-danger"><i class="fa fa-trash" aria-hidden="true"></i> Supprimer les doublons</a>';
+		  		echo '<form method="post" action="?do=tools" onsubmit="return confirm(\'Êtes-vous sûr ?\');">'.csrf_field().'<input type="hidden" name="delete_doublon" value="yes"/><input type="hidden" name="id_collection" value="'.intval($collections['id']).'"/><button type="submit" class="btn btn-danger"><i class="fa fa-trash" aria-hidden="true"></i> Supprimer les doublons</button></form>';
 		  	}
-      		if(isset($_GET['delete_doublon']) AND is_logged() AND csrf_ok('GET')) {
-      			sql('DELETE FROM presse WHERE id NOT IN (SELECT MAX(id) FROM presse GROUP BY title, id_collection) AND id_collection=?', array(intval($_GET['id_collection'])));
+      		if(isset($_POST['delete_doublon']) AND is_logged() AND csrf_ok('POST')) {
+      			sql('DELETE FROM presse WHERE id NOT IN (SELECT MAX(id) FROM presse GROUP BY title, id_collection) AND id_collection=?', array(intval($_POST['id_collection'])));
       			redirect('index.php?do=tools');
       		}
         break;
         case 'import':
         	if(!is_logged()) {redirect('index.php?do=login');}
 			if(isset($_POST['collection']) AND csrf_ok('POST')) {
-			       $target = 'data/import/'.basename($_FILES["file"]["name"]);
-			        move_uploaded_file($_FILES["file"]["tmp_name"], $target);
+				$upload_error = (isset($_FILES['file']['error'])) ? $_FILES['file']['error'] : UPLOAD_ERR_NO_FILE;
+				$target = '';
+				if($upload_error === UPLOAD_ERR_OK AND is_uploaded_file($_FILES['file']['tmp_name'])) {
+					$target = 'data/import/'.basename($_FILES['file']['name']);
+					if(!move_uploaded_file($_FILES['file']['tmp_name'], $target)) {$target = '';}
+				}
+				if($target === '') {
+					echo '<div class="alert alert-warning" role="alert">Téléversement impossible (fichier manquant ou trop volumineux)</div>';
+				}
 
 					/*
 			        $csv = array_map('str_getcsv', file($target));
@@ -551,7 +562,7 @@ if(isset($_GET['do'])) {
 			        }
 			        
 			        */
-			        if(mime_content_type($target) == 'text/csv') {
+			        if($target !== '' AND mime_content_type($target) == 'text/csv') {
 					    if (($handle = fopen($target, "r")) !== FALSE) {
 							while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
 								if($data['3'] != 'journal') {
@@ -562,7 +573,7 @@ if(isset($_GET['do'])) {
 							fclose($handle);
 						}
 			        }
-			        elseif(mime_content_type($target) == 'text/html')  {
+			        elseif($target !== '' AND mime_content_type($target) == 'text/html')  {
 					    $dom = HtmlDomParser::file_get_html($target);
 						$list_articles = array();
 						foreach($dom->find('article') as $article) {
@@ -615,8 +626,8 @@ if(isset($_GET['do'])) {
 				$id = 0;
 				$permit = '';
 			}
-			if(isset($_GET['delete']) AND csrf_ok('GET')) {
-				sql('DELETE FROM users WHERE id=?', array(intval($_GET['delete'])));
+			if(isset($_POST['delete']) AND csrf_ok('POST')) {
+				sql('DELETE FROM users WHERE id=?', array(intval($_POST['delete'])));
 			}
 			if(isset($_POST['login']) AND csrf_ok('POST')) {
 				$_POST['permit'] = isset($_POST['permit']) ? 1 : 0;
@@ -650,7 +661,7 @@ if(isset($_GET['do'])) {
 			        		<td>'.$permit.'</td>
 			            <td>
 			                <a href="?do=admin&id='.intval($data['id']).'" class="btn btn-primary"><i class="fa fa-pencil" aria-hidden="true"></i></a>
-			                <a href="?do=admin&delete='.intval($data['id']).'&token='.h($_SESSION['token']).'" class="btn btn-danger"  onclick="return confirm(\'Êtes-vous sûr ?\');"><i class="fa fa-trash" aria-hidden="true"></i></a>
+			                <form method="post" action="?do=admin" style="display:inline" onsubmit="return confirm(\'Êtes-vous sûr ?\');">'.csrf_field().'<input type="hidden" name="delete" value="'.intval($data['id']).'"/><button type="submit" class="btn btn-danger"><i class="fa fa-trash" aria-hidden="true"></i></button></form>
 			            </td>
 			        </tr>';
 			    }
@@ -666,11 +677,16 @@ if(isset($_GET['do'])) {
                 header('Location: index.php');
                 exit();
             }
-            if (isset($_POST['pwd'])) {
+            if (isset($_POST['pwd']) AND csrf_ok('POST')) {
+                if(!login_throttle_ok()) {
+                    echo '<div class="alert alert-warning" role="alert">Trop de tentatives, réessayez plus tard</div>';
+                }
+                else {
                 $something = $db->prepare("SELECT * FROM users WHERE login=?");
 				$something->execute(array($_POST['login']));
 				$data = $something->fetch();
                 if ($data AND password_verify($_POST['pwd'], $data['password']) AND $_POST['login'] == $data['login']) {
+                    login_throttle_reset();
                     session_regenerate_id(true);
                     $_SESSION['login'] = true;
                     $_SESSION['permit'] = (int)$data['permit'];
@@ -678,10 +694,13 @@ if(isset($_GET['do'])) {
                     redirect('index.php');
                 } else {
                     $_SESSION['login'] = false;
+                    login_throttle_fail();
                     echo '<div class="alert alert-warning" role="alert">Erreur : mauvais identifiant ou mot de passe</div>';
+                }
                 }
             }
         echo'<form method="post" action="?do=login" class="d-print-none">
+            '.csrf_field().'
             <label>Courriel</label> <input type="text" name="login" class="form-control"/>
             <label>Phrase de passe</label> <input type="password" name="pwd" class="form-control"/>
            <input type="submit" name="submit" value="Envoyer" class="btn btn-primary mb-3"/>

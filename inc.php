@@ -1,8 +1,13 @@
 <?php
-session_set_cookie_params(['httponly' => true, 'samesite' => 'Strict', 'secure' => (!empty($_SERVER['HTTPS']) AND $_SERVER['HTTPS'] !== 'off')]);
-session_start();
 use voku\helper\HtmlDomParser;
 include 'vendor/autoload.php';
+
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: DENY');
+header('Referrer-Policy: same-origin');
+
+session_set_cookie_params(['httponly' => true, 'samesite' => 'Strict', 'secure' => (!empty($_SERVER['HTTPS']) AND $_SERVER['HTTPS'] !== 'off')]);
+session_start();
 
 function sql($query='', $values=array()) {
     global $db;
@@ -33,6 +38,43 @@ function csrf_field() {
 function csrf_ok($method='POST') {
 	$token = ($method === 'POST') ? (isset($_POST['token']) ? $_POST['token'] : '') : (isset($_GET['token']) ? $_GET['token'] : '');
 	return $token !== '' AND isset($_SESSION['token']) AND hash_equals($_SESSION['token'], $token);
+}
+function url_allowed($url) {
+	if(!filter_var($url, FILTER_VALIDATE_URL)) {return false;}
+	$parts = parse_url($url);
+	if(!isset($parts['scheme']) OR !in_array(strtolower($parts['scheme']), array('http', 'https'))) {return false;}
+	if(!isset($parts['host']) OR $parts['host'] === '') {return false;}
+	$host = strtolower($parts['host']);
+	if(filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+		$ip = $host;
+	}
+	elseif(filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+		$ip = $host;
+	}
+	else {
+		$ip = gethostbyname($host);
+		if($ip === $host) {return false;}
+	}
+	$priv4 = array('10', '127', '0');
+	if(filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+		$o = explode('.', $ip);
+		if($o[0] == '10' OR $o[0] == '127' OR $o[0] == '0' OR ($o[0] == '192' AND $o[1] == '168') OR ($o[0] == '172' AND $o[1] >= 16 AND $o[1] <= 31) OR ($o[0] == '169' AND $o[1] == '254')) {return false;}
+	}
+	elseif(filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+		$low = strtolower($ip);
+		if(strpos($low, '::1') === 0 OR strpos($low, 'fc') === 0 OR strpos($low, 'fd') === 0 OR strpos($low, 'fe80') === 0) {return false;}
+	}
+	return true;
+}
+function login_throttle_ok() {
+	$fails = (isset($_SESSION['login_fails'])) ? (int)$_SESSION['login_fails'] : 0;
+	return $fails < 5;
+}
+function login_throttle_fail() {
+	$_SESSION['login_fails'] = ((isset($_SESSION['login_fails'])) ? (int)$_SESSION['login_fails'] : 0) + 1;
+}
+function login_throttle_reset() {
+	unset($_SESSION['login_fails']);
 }
 function exportcsv($entries, $filename) {
     $out = fopen($filename, 'w');
