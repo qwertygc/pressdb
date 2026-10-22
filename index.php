@@ -129,7 +129,7 @@ if(isset($_GET['do'])) {
             }
             echo '<table class="table">
                     <tr><th>Collections</th><th>Actions</th></tr>';
-            $query = $db->query('SELECT c.*, (SELECT COUNT(*) FROM presse p WHERE p.id_collection = c.id AND p.category = ?) as a_trier FROM collections c ORDER BY c.id', array('à_trier'));
+            $query = sql('SELECT c.*, (SELECT COUNT(*) FROM presse p WHERE p.id_collection = c.id AND p.category = ?) as a_trier FROM collections c ORDER BY c.id', array('à_trier'));
             while($data = $query->fetch()) {
                 echo '<tr><td><a href="?do=view&idp='.intval($data['id']).'">'.h($data['name']).'</a> '.((intval($data['public']) === 1) ? '<span class="badge text-bg-success">public</span>' : '<span class="badge text-bg-secondary">privée</span>').((intval($data['a_trier']) > 0) ? ' <span class="badge text-bg-warning">'.intval($data['a_trier']).' à trier</span>' : '').'</td>
                     <td>
@@ -593,7 +593,7 @@ echo '</form></div></div>';
 	        <label>Collection</label>
 	        <select class="form-select" name="collection">';
 	            //$id_collection = (isset($_GET['idp'])) ? $_GET['idp'] : 0;
-	            $query = $db->query('SELECT c.*, (SELECT COUNT(*) FROM presse p WHERE p.id_collection = c.id AND p.category = ?) as a_trier FROM collections c ORDER BY c.id', array('à_trier'));
+	            $query = sql('SELECT c.*, (SELECT COUNT(*) FROM presse p WHERE p.id_collection = c.id AND p.category = ?) as a_trier FROM collections c ORDER BY c.id', array('à_trier'));
 	            while($data = $query->fetch()) {
 			        $selected = ((int)$data['id'] == (int)$id_collection) ? 'selected' : '';
 			      	echo '<option value="'.$data['id'].'" '.$selected.'>'.$data['name'].'</option>';
