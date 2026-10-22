@@ -15,6 +15,23 @@ function sql($query='', $values=array()) {
     $query->execute($values);
     return $query;
 }
+function no_accents($str) {
+	$converted = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', (string)$str);
+	if($converted === false) {return strtolower((string)$str);}
+	return strtolower($converted);
+}
+function paginate_links($base_url, $current_page, $per_page, $total) {
+	$pages = (int)ceil($total / $per_page);
+	if($pages <= 1) {return '';}
+	$out = '<nav><ul class="pagination">';
+	for($p = 1; $p <= $pages; $p++) {
+		$active = ($p == $current_page) ? ' active' : '';
+		$sep = (strpos($base_url, '?') === false) ? '?' : '&';
+		$out .= '<li class="page-item'.$active.'"><a class="page-link" href="'.h($base_url.$sep.'page='.$p).'">'.$p.'</a></li>';
+	}
+	return $out.'</ul></nav>';
+}
+
 function h($str) {
 	return htmlspecialchars((string)$str, ENT_QUOTES, 'UTF-8');
 }
@@ -116,21 +133,25 @@ function europresse2standardtime($str) {
 		);
 }
 
+$chart_configs = array();
 function chart_counter() {
     static $n = 0;
     $n++;
     return 'chart'.$n;
 }
 function quickchart($type, $labels=array('Q1', 'Q2', 'Q3', 'Q4'), $ds=array(array('label'=>'Dogs', 'data'=>array(1, 2, 3, 4)))) {
+    global $chart_configs;
+    if(!isset($chart_configs) OR !is_array($chart_configs)) {$chart_configs = array();}
     $config = [
         'type' => $type,
         'data' => [
-            'labels' => $labels,
-            'datasets' => $ds
+            'labels' => (is_array($labels) ? $labels : array()),
+            'datasets' => (is_array($ds) ? $ds : array(array('label' => 'Occurrences', 'data' => array())))
         ]
     ];
     $id = chart_counter();
-    return '<canvas id="'.$id.'"></canvas><script>new Chart(document.getElementById("'.$id.'"), '.json_encode($config).');</script>';
+    $chart_configs[$id] = $config;
+    return '<canvas id="'.$id.'"></canvas>';
 }
 function beautiful_url($url) {
 	if(filter_var($url, FILTER_VALIDATE_URL)) {
@@ -181,34 +202,33 @@ function badge($text) {
 	}
 	return '<span class="badge '.$color.'"><i class="fa fa-tags" aria-hidden="true"></i> '.h($text).'</span>';
 }            
- function show_article($array=array('id'=>'', 'date'=>'', 'journal'=>'', 'category'=>'', 'source'=>'', 'content'=>''), $details=false) {
+  function show_article($array=array('id'=>'', 'date'=>'', 'journal'=>'', 'category'=>'', 'source'=>'', 'content'=>''), $details=false, $bulk=false) {
  	global $db;
- 	$filter_cat = (isset($_GET['idp'])) ? ' WHERE id_collection='.intval($_GET['idp']): '';
-	$return = '<article>
-		    <header>
-		    <h1><a href="index.php?do=view&article='.intval($array['id']).'"><i class="fa fa-link" aria-hidden="true"></i></a> '.h($array['title']).'</h1>
-		    <aside>
-		    <div class="d-print-none">';
-        if(!is_logged()) {
-        }
-        else {
-        	$tags = '<div class="btn-group">
-				  <button type="button" class="btn btn-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-					<i class="fa fa-tags" aria-hidden="true"></i> Assigner une catégorie
-				  </button>
-				  <ul class="dropdown-menu">';
-					 foreach(categories_list(isset($_GET['idp']) ? intval($_GET['idp']) : null) as $cat) {
-							$tags .= '<li><a class="dropdown-item" href="api.php?do=update-category&id='.intval($array['id']).'&category='.urlencode($cat).'&token='.h($_SESSION['token']).'&idp='.intval(@$_GET['idp']).'" data-ajax="true">'.h($cat).'</a></li>';
-					 }
-					$tags .='</ul></div>';
-				$return .= '<a href="?do=add&id='.intval($array['id']).'" class="btn btn-primary" target="_blank"><i class="fa fa-pencil" aria-hidden="true"></i> Éditer</a>
-				<a  href="api.php?do=delete-entry&delete='.intval($array['id']).'&token='.h($_SESSION['token']).'&idp='.intval(@$_GET['idp']).'" class="btn btn-danger"  onclick="return confirm(\'Êtes-vous sûr ?\');" data-ajax="true"><i class="fa fa-trash" aria-hidden="true"></i> Supprimer</a>
-			'.$tags.'';
+ 	$filter_cat = (isset($_GET['idp']) AND intval($_GET['idp']) > 0) ? ' WHERE id_collection='.intval($_GET['idp']): '';
+	$id = intval($array['id']);
+	$return = '<article class="border rounded p-2 mb-2">
+	    <header class="d-flex flex-wrap align-items-start gap-2">
+	    '.(($bulk AND is_logged()) ? '<input type="checkbox" name="bulk_ids[]" value="'.$id.'" aria-label="Sélectionner"/> ' : '').'<h2 class="h6 flex-grow-1 mb-0"><a href="index.php?do=view&article='.$id.'"><i class="fa fa-link" aria-hidden="true"></i></a> '.h($array['title']).'</h2>';
+        if(is_logged()) {
+        	$tags = '<li class="dropdown-header">Assigner une catégorie</li>';
+			 foreach(categories_list((isset($_GET['idp']) AND intval($_GET['idp']) > 0) ? intval($_GET['idp']) : null) as $cat) {
+					$tags .= '<li><a class="dropdown-item" href="api.php?do=update-category&id='.$id.'&category='.urlencode($cat).'&token='.h($_SESSION['token']).'&idp='.intval(@$_GET['idp']).'" data-ajax="true">'.h($cat).'</a></li>';
+			 }
+			$return .= '<div class="dropdown d-print-none">
+				<button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Actions"><i class="fa fa-ellipsis-h" aria-hidden="true"></i></button>
+				<ul class="dropdown-menu">
+				<li><a class="dropdown-item" href="?do=add&id='.$id.'"><i class="fa fa-pencil" aria-hidden="true"></i> Éditer</a></li>
+				<li><hr class="dropdown-divider"/></li>
+				'.$tags.'
+				<li><hr class="dropdown-divider"/></li>
+				<li><a class="dropdown-item text-danger" href="api.php?do=delete-entry&delete='.$id.'&token='.h($_SESSION['token']).'&idp='.intval(@$_GET['idp']).'" onclick="return confirm(\'Êtes-vous sûr ?\');" data-ajax="true"><i class="fa fa-trash" aria-hidden="true"></i> Supprimer</a></li>
+				</ul>
+			</div>';
 		}
-	    $return .='<p><i class="fa fa-calendar" aria-hidden="true"></i> <time>'.h($array['date']).'</time> ⋅ <i class="fa fa-newspaper-o" aria-hidden="true"></i> '.h($array['journal']).' ⋅ '.badge($array['category']).' ⋅ <i class="fa fa-link" aria-hidden="true"></i> '.beautiful_url($array['source']).' ⋅ '.str_word_count((string)$array['content'],0).' mots</p>
-		    </aside>
-		    </header>
-		    <main>';
+	    $return .='</header>
+	    <p class="mb-1 mt-1 small text-muted"><time datetime="'.h($array['date']).'"><strong>'.h($array['date']).'</strong></time> ⋅ <i class="fa fa-newspaper-o" aria-hidden="true"></i> '.h($array['journal']).' ⋅ '.badge($array['category']).' ⋅ <i class="fa fa-link" aria-hidden="true"></i> '.beautiful_url($array['source']).((!empty($array['dupe_count'])) ? ' ⋅ <span class="badge text-bg-warning" title="Titre partagé avec '.(int)$array['dupe_count'].' autre(s) article(s)"><i class="fa fa-exclamation-triangle" aria-hidden="true"></i> doublon ×'.((int)$array['dupe_count'] + 1).'</span>' : '').' ⋅ '.str_word_count((string)$array['content'],0).' mots</p>';
+	    $main_class = ($details == true) ? 'article-full' : 'article-compact';
+	    $return .= '<main class="'.$main_class.'">';
 		$return .= ($details == false) ? nl2br(h($array['content'])) : '<details><summary>Développer</summary>'.nl2br(h($array['content'])).'</details>';
 		$return .= '   </main>
 		</article>';
@@ -223,7 +243,8 @@ if(!file_exists('data')) {
 		$db->query('
 CREATE TABLE "collections" (
 	"id"	INTEGER PRIMARY KEY AUTOINCREMENT,
-	"name"	TEXT
+	"name"	TEXT,
+	"public"	INTEGER DEFAULT 0
 );');
 		$db->query('
 CREATE TABLE "presse" (
@@ -290,6 +311,10 @@ function article_categories($id_presse) {
 	if($id_presse <= 0) {return array();}
 	return sql('SELECT c.name FROM presse_categories pc JOIN categories c ON c.id = pc.id_category WHERE pc.id_presse = ? ORDER BY c.name', array($id_presse))->fetchAll(PDO::FETCH_COLUMN);
 }
+function public_collections_clause($alias) {
+	if(is_logged()) {return '';}
+	return ' AND ('.$alias.'.public = 1)';
+}
 function categories_list($id_collection = null) {
 	if($id_collection !== null) {
 		return sql('SELECT DISTINCT c.name FROM categories c JOIN presse_categories pc ON pc.id_category = c.id JOIN presse p ON p.id = pc.id_presse WHERE p.id_collection = ? ORDER BY c.name', array((int)$id_collection))->fetchAll(PDO::FETCH_COLUMN);
@@ -301,6 +326,10 @@ function migrate_categories() {
 	foreach($data as $row) {
 		article_set_categories($row['id'], $row['category']);
 	}
+}
+$col_public = sql("SELECT count(*) as n FROM pragma_table_info('collections') WHERE name = 'public'", array())->fetch();
+if((int)$col_public['n'] === 0) {
+	$db->query('ALTER TABLE collections ADD COLUMN public INTEGER DEFAULT 0;');
 }
 $cat_tables = sql("SELECT count(*) as n FROM sqlite_master WHERE type='table' AND name IN ('categories', 'presse_categories')", array())->fetch();
 if((int)$cat_tables['n'] < 2) {

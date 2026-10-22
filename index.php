@@ -5,6 +5,7 @@ include 'inc.php';
 <html>
 <head>
 <title>Presse</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
 <link href="vendor/twbs/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
 <script src="vendor/twbs/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
 <script src="vendor/nnnick/chartjs/dist/chart.umd.js" onerror="var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/chart.js@4';document.head.appendChild(s);"></script>
@@ -44,6 +45,10 @@ include 'inc.php';
 </head>
 <body class="container-fluid">
 <nav class="navbar navbar-expand-lg navbar-light bg-light d-print-none">
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain" aria-controls="navMain" aria-expanded="false" aria-label="Menu">
+        <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navMain">
     <ul class="navbar-nav">
       <li class="nav-item">
         <a class="nav-link" href="index.php"><i class="fa fa-database" aria-hidden="true"></i> Base de données</a>
@@ -53,6 +58,28 @@ include 'inc.php';
       </li>
       <li class="nav-item">
         <a class="nav-link" href="index.php?do=view"><i class="fa fa-eye" aria-hidden="true"></i> Voir</a>
+      </li>
+      <li class="nav-item d-flex align-items-center ms-2">
+        <form method="get" action="index.php" class="d-flex" id="nav-collection-form">
+          <input type="hidden" name="do" value="view"/>
+<?php foreach(array('date_begin', 'date_end', 'search', 'orderby', 'orderdir') as $np): if(!empty($_GET[$np])): ?>
+          <input type="hidden" name="<?= h($np) ?>" value="<?= h($_GET[$np]) ?>"/>
+<?php endif; endforeach; ?>
+<?php foreach(array('journal', 'category') as $npa): if(!empty($_GET[$npa]) AND is_array($_GET[$npa])): foreach($_GET[$npa] as $npv): ?>
+          <input type="hidden" name="<?= h($npa) ?>[]" value="<?= h($npv) ?>"/>
+<?php endforeach; endif; endforeach; ?>
+          <select name="idp" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="Collection">
+            <option value="">Toutes les collections</option>
+<?php
+$collections_nav = sql('SELECT c.id, c.name, (SELECT COUNT(*) FROM presse p WHERE p.id_collection = c.id AND p.category = ?) as a_trier FROM collections c WHERE 1=1'.public_collections_clause('c').' ORDER BY c.name', array('à_trier'));
+while($col_nav = $collections_nav->fetch()):
+  $sel = ((int)@$_GET['idp'] === (int)$col_nav['id']) ? ' selected' : '';
+?>
+            <option value="<?= (int)$col_nav['id'] ?>"<?= $sel ?>><?= h($col_nav['name']) ?><?= ((int)$col_nav['a_trier'] > 0) ? ' ('.(int)$col_nav['a_trier'].' à trier)' : '' ?></option>
+<?php endwhile; ?>
+          </select>
+          <noscript><button type="submit" class="btn btn-sm btn-outline-secondary ms-1">Aller</button></noscript>
+        </form>
       </li>
       <?php  if(is_logged()) : ?>
       <li class="nav-item">
@@ -74,6 +101,7 @@ include 'inc.php';
         <a class="nav-link" href="index.php?do=login"><i class="fa fa-sign-in" aria-hidden="true"></i> <?php echo (!check(@$_SESSION['login'])) ? 'Connexion': 'Déconnexion'; ?></a>
       </li>
     </ul>
+    </div>
 </nav>
 <main>
 <?php
@@ -90,17 +118,22 @@ if(isset($_GET['do'])) {
         echo '<form method="post" class="d-print-none" action="?do=collections">
                '.csrf_field().'
                <label>Nom de la collection</label><input type="text" name="collection_name" class="form-control" />
+               <div class="form-check"><input type="checkbox" name="collection_public" value="1" class="form-check-input" id="collectionPublic"/><label class="form-check-label" for="collectionPublic">Lecture publique (visible sans connexion)</label></div>
                <input type="submit" class="btn btn-primary mb-3"/>
                 </form>';
             if(isset($_POST['collection_name']) AND csrf_ok('POST')) {
-                sql('INSERT into collections (name) VALUES (?)', array($_POST['collection_name']));
+                sql('INSERT into collections (name, public) VALUES (?, ?)', array($_POST['collection_name'], (isset($_POST['collection_public'])) ? 1 : 0));
+            }
+            if(isset($_POST['toggle_public']) AND csrf_ok('POST')) {
+            	sql('UPDATE collections SET public = ((public + 1) % 2) WHERE id = ?', array(intval($_POST['toggle_public'])));
             }
             echo '<table class="table">
                     <tr><th>Collections</th><th>Actions</th></tr>';
-            $query = $db->query('SELECT * FROM collections ORDER BY id');
+            $query = sql('SELECT c.*, (SELECT COUNT(*) FROM presse p WHERE p.id_collection = c.id AND p.category = ?) as a_trier FROM collections c ORDER BY c.id', array('à_trier'));
             while($data = $query->fetch()) {
-                echo '<tr><td><a href="?do=view&idp='.intval($data['id']).'">'.h($data['name']).'</a></td>
+                echo '<tr><td><a href="?do=view&idp='.intval($data['id']).'">'.h($data['name']).'</a> '.((intval($data['public']) === 1) ? '<span class="badge text-bg-success">public</span>' : '<span class="badge text-bg-secondary">privée</span>').((intval($data['a_trier']) > 0) ? ' <span class="badge text-bg-warning">'.intval($data['a_trier']).' à trier</span>' : '').'</td>
                     <td>
+                    <form method="post" action="?do=collections" style="display:inline">'.csrf_field().'<input type="hidden" name="toggle_public" value="'.intval($data['id']).'"/>'.'<button type="submit" class="btn btn-sm btn-outline-secondary" title="Basculer public/privée">'.'<i class="fa fa-eye'.((intval($data['public']) === 1) ? '' : '-slash').'" aria-hidden="true"></i></button></form>
                     <div class="btn-group" role="group" aria-label="Basic example">
                         <a href="?do=view&idp='.intval($data['id']).'" class="btn btn-primary btn-sm"><i class="fa fa-eye" aria-hidden="true"></i> Voir</a>
                         <a href="?do=view&sort='.intval($data['id']).'" class="btn btn-primary btn-sm"><i class="fa fa-sort"></i> Trier</a>
@@ -116,7 +149,7 @@ if(isset($_GET['do'])) {
         case 'view':
         	#if(!check(@$_SESSION['login']) AND $_SERVER['SERVER_NAME'] !='localhost') {header('Location: index.php?do=login');}
         	if(isset($_GET['article'])) {
-        		$something = sql('SELECT * FROM presse WHERE id=?', array(intval($_GET['article'])));
+        		$something = sql('SELECT p.* FROM presse p JOIN collections c ON c.id = p.id_collection WHERE p.id = ?'.public_collections_clause('c'), array(intval($_GET['article'])));
                 $something->setFetchMode(PDO::FETCH_BOTH);
                 $data = $something->fetch();
                 $_GET['idp'] = $data['id_collection'];
@@ -136,49 +169,69 @@ if(isset($_GET['do'])) {
 			        }
         	}
         	else {
-        		$filter_cat = (isset($_GET['idp'])) ? ' WHERE id_collection='.$_GET['idp']: '';
+        		if(!isset($_GET['collection']) AND isset($_GET['idp'])) {$_GET['collection'] = $_GET['idp'];}
+        		if(isset($_GET['collection']) AND intval($_GET['collection']) > 0) {$_GET['idp'] = $_GET['collection'];}
+        		$filter_cat = (isset($_GET['idp']) AND intval($_GET['idp']) > 0) ? ' WHERE id_collection='.intval($_GET['idp']): '';
 				$date_begin = (isset($_GET['date_begin'])) ? $_GET['date_begin'] : '1900-01-01';
 				$date_end = (isset($_GET['date_end'])) ? $_GET['date_end'] : date('Y-m-d', time());
-		        echo'<form method="get" class="d-print-none">
-		            <label>Collection</label>
-		            <select class="form-select" name="collection">';
-		                //$id_collection = (isset($_GET['idp'])) ? $_GET['idp'] : 0;
-		                $query = $db->query('SELECT * FROM collections ORDER BY id');
-		                while($data = $query->fetch()) {
-				            $selected = ((int)$data['id'] == (int)$_GET['idp']) ? 'selected' : '';
-				          	echo '<option value="'.$data['id'].'" '.$selected.'>'.$data['name'].'</option>';
-						}
-		            echo '</select>
-		            <label>Date de début</label><input type="date" name="date_begin" value="'.$date_begin.'" class="form-control" />
-		            <label>Date de fin</label><input type="date" name="date_end" value="'.$date_end.'" class="form-control" />
-		            <label>Journaux</label>       
-		            <select class="form-select" multiple aria-label="multiple select" name="journal[]">';
-		                    $journal = (isset($_GET['journal'])) ? $_GET['journal'] : array();
-		                    $query = $db->query('SELECT DISTINCT trim(journal) as journal FROM presse '.$filter_cat.' ORDER BY journal');
-		                    while($data = $query->fetch()) {
-				               	$selected = (in_array($data['journal'], $journal)) ? 'selected' : '';
-				          		echo '<option value="'.h($data['journal']).'" '.$selected.'>'.h($data['journal']).'</option>';
-		              		}
-		           echo ' </select>
-		            <label>Catégories</label>
-		            <select class="form-select" multiple aria-label="multiple select" name="category[]">';
-		                $category = (isset($_GET['category'])) ? $_GET['category'] : array();
-		                $query = $db->query('SELECT DISTINCT trim(category) as category FROM presse '.$filter_cat.' ORDER BY category');
-		                $data = $query->fetchAll(PDO::FETCH_COLUMN);
-		                foreach(tags($data) as $cat) {
-		                	$selected = (in_array($cat, $category)) ? 'selected' : '';
-		                	echo '<option value="'.$cat.'" '.$selected.'>'.$cat.'</option>';
-		                }
-		           
-		            echo '</select>
-		            <label>Mot-clé</label> <input type="search" name="search" class="form-control"/>
-		            <input type="hidden" name="do" value="view"/>
-		            <input type="hidden" name="idp" value="'.$_GET['idp'].'"/>
-		            <input type="submit" name="submit" value="Exécuter" class="btn btn-primary mb-3"/>
-		            <input type="submit" name="submit_file" value="Exporter" class="btn btn-primary mb-3"/>
-					<a href="?do=view&sort='.$_GET['idp'].'" class="btn btn-primary mb-3"><i class="fa fa-sort"></i> Trier</a>
-		            </form>';
-		    if(isset($_GET['submit']) OR isset($_GET['htmlview']) OR isset($_GET['submit_file'])) {
+$active_collection = (isset($_GET['collection']) AND intval($_GET['collection']) > 0) ? intval($_GET['collection']) : ((isset($_GET['idp']) AND intval($_GET['idp']) > 0) ? intval($_GET['idp']) : 0);
+$active_badges = array();
+if($active_collection > 0) {
+	$cname = sql('SELECT name FROM collections WHERE id = ?', array($active_collection))->fetch();
+	$active_badges[] = array('key' => 'collection', 'label' => ($cname ? h($cname['name']) : '#'.$active_collection));
+}
+if(!empty($_GET['date_begin']) AND $_GET['date_begin'] != '1900-01-01') {$active_badges[] = array('key' => 'date_begin', 'label' => 'dès '.h($_GET['date_begin']));}
+if(!empty($_GET['date_end']) AND $_GET['date_end'] != date('Y-m-d')) {$active_badges[] = array('key' => 'date_end', 'label' => 'jusqu\'à '.h($_GET['date_end']));}
+foreach((array)@$_GET['journal'] as $j) {$active_badges[] = array('key' => 'journal', 'label' => h($j));}
+foreach((array)@$_GET['category'] as $c) {$active_badges[] = array('key' => 'category', 'label' => h($c));}
+if(!empty($_GET['search'])) {$active_badges[] = array('key' => 'search', 'label' => '« '.h($_GET['search']).' »');}
+
+echo '<div class="mb-3 d-print-none">';
+if(count($active_badges) > 0) {
+	echo '<p class="mb-1"><strong>Filtres actifs :</strong> ';
+	foreach($active_badges as $b) {echo '<span class="badge text-bg-secondary">'.$b['label'].'</span> ';}
+	echo '<a class="btn btn-sm btn-outline-secondary" href="index.php?do=view">Tout effacer</a>';
+	echo '</p>';
+}
+echo '<p class="mb-1"><a class="btn btn-primary" data-bs-toggle="collapse" href="#filterPanel" role="button" aria-expanded="false" aria-controls="filterPanel"><i class="fa fa-filter" aria-hidden="true"></i> Filtrer / Afficher le corpus</a></p>';
+echo '<div class="collapse" id="filterPanel">';
+echo '<form method="get" class="card card-body bg-light">';
+echo '<input type="hidden" name="do" value="view"/>';
+echo '<div class="row g-2"><div class="col-md-4"><label class="form-label">Collection</label>';
+echo '<select class="form-select" name="collection">';
+$query = $db->query('SELECT * FROM collections c WHERE 1=1'.public_collections_clause('c').' ORDER BY name');
+echo '<option value="">Toutes</option>';
+while($data = $query->fetch()) {
+	$selected = ((int)$data['id'] === $active_collection) ? ' selected' : '';
+	echo '<option value="'.intval($data['id']).'"'.$selected.'>'.h($data['name']).'</option>';
+}
+echo '</select></div>';
+echo '<div class="col-md-4"><label class="form-label">Date de début</label><input type="date" name="date_begin" value="'.h($date_begin).'" class="form-control"/></div>';
+echo '<div class="col-md-4"><label class="form-label">Date de fin</label><input type="date" name="date_end" value="'.h($date_end).'" class="form-control"/></div>';
+echo '</div>';
+echo '<div class="row g-2 mt-1"><div class="col-md-6"><label class="form-label">Journaux</label>';
+echo '<select class="form-select" multiple size="5" aria-label="multiple select" name="journal[]">';
+$journal = (isset($_GET['journal'])) ? $_GET['journal'] : array();
+$query = $db->query('SELECT DISTINCT trim(journal) as journal FROM presse '.$filter_cat.' ORDER BY journal');
+while($data = $query->fetch()) {
+	$selected = (in_array($data['journal'], $journal)) ? 'selected' : '';
+	echo '<option value="'.h($data['journal']).'" '.$selected.'>'.h($data['journal']).'</option>';
+}
+echo ' </select></div>';
+echo '<div class="col-md-6"><label class="form-label">Catégories</label>';
+echo '<select class="form-select" multiple size="5" aria-label="multiple select" name="category[]">';
+$category = (isset($_GET['category'])) ? $_GET['category'] : array();
+foreach(categories_list(($active_collection > 0) ? $active_collection : null) as $cat) {
+	$selected = (in_array($cat, $category)) ? 'selected' : '';
+	echo '<option value="'.h($cat).'" '.$selected.'>'.h($cat).'</option>';
+}
+echo '</select></div></div>';
+echo '<div class="row g-2 mt-1 align-items-end"><div class="col-md"><label class="form-label">Mot-clé</label>';
+echo '<input type="search" name="search" value="'.h(@$_GET['search']).'" class="form-control"/></div>';
+echo '<div class="col-md-auto"><button type="submit" name="submit" value="1" class="btn btn-primary"><i class="fa fa-play" aria-hidden="true"></i> Exécuter</button> ';
+echo '<button type="submit" name="submit_file" value="1" class="btn btn-outline-primary"><i class="fa fa-download" aria-hidden="true"></i> Exporter</button></div></div>';
+echo '</form></div></div>';
+		    {
 		    	if(isset($_GET['htmlview'])) {
 		    		$_GET['collection'] = intval(@$_GET['idp']);
 		    	}
@@ -210,15 +263,78 @@ if(isset($_GET['do'])) {
 		        }
 		        $search = '';
 		        if(isset($_GET['search']) AND $_GET['search'] != '') {
-		            $search .= 'AND (title LIKE ? OR content LIKE ?)';
+		            $search .= 'AND (title LIKE ? OR content LIKE ? OR title LIKE ? OR content LIKE ?)';
 		            $params[] = '%'.$_GET['search'].'%';
 		            $params[] = '%'.$_GET['search'].'%';
+		            $params[] = '%'.no_accents($_GET['search']).'%';
+		            $params[] = '%'.no_accents($_GET['search']).'%';
 		        }
-		        $collection = (($period != '') ? 'AND ' : '').'id_collection=?';
-		        $params[] = intval(@$_GET['collection']);
-		        $sql = 'SELECT * FROM presse WHERE '.$period.' '.$journaux.' '.$categories.' '.$search.' '.$collection.' ORDER BY date';
-		        echo '<h1>Corpus de la revue de presse (généré le '.date('c', time()).')</h1>';
-		        echo '<a href="javascript:window.print()">Imprimer</a>';
+		        $collection = ((intval(@$_GET['collection']) > 0) ? ((trim($period.' '.$journaux.' '.$categories.' '.$search) != '') ? 'AND ' : '').'id_collection=?' : '');
+		        if(intval(@$_GET['collection']) > 0) {$params[] = intval($_GET['collection']);}
+		        if(!is_logged()) {
+		        	$visible_cols = sql('SELECT id FROM collections WHERE public = 1', array())->fetchAll(PDO::FETCH_COLUMN);
+		        	if(count($visible_cols) > 0) {
+		        		$collection .= (($collection !== '') ? ' AND ' : '').'id_collection IN ('.implode(',', array_map('intval', $visible_cols)).')';
+		        	}
+		        	else {
+		        		$collection = '1=0';
+		        	}
+		        }
+		        $sortable = array('date' => 'date', 'journal' => 'journal', 'title' => 'title');
+		        $order_col = (isset($_GET['orderby']) AND isset($sortable[$_GET['orderby']])) ? $sortable[$_GET['orderby']] : 'date';
+		        $order_dir = (isset($_GET['orderdir']) AND strtolower($_GET['orderdir']) === 'desc') ? 'DESC' : 'ASC';
+		        $per_page = 50;
+		        $current_page = (isset($_GET['page'])) ? max(1, intval($_GET['page'])) : 1;
+		        $sql_count = 'SELECT count(*) as total FROM presse WHERE '.$period.' '.$journaux.' '.$categories.' '.$search.' '.$collection;
+		        $total_rows = (int)sql($sql_count, $params)->fetch()['total'];
+		        $total_pages_display = (int)ceil($total_rows / $per_page);
+		        $offset = ($current_page - 1) * $per_page;
+		        $sql = 'SELECT * FROM presse WHERE '.$period.' '.$journaux.' '.$categories.' '.$search.' '.$collection.' ORDER BY '.$order_col.' '.$order_dir.' LIMIT '.$per_page.' OFFSET '.$offset.' ';
+		        $export_sql = 'SELECT * FROM presse WHERE '.$period.' '.$journaux.' '.$categories.' '.$search.' '.$collection.' ORDER BY '.$order_col.' '.$order_dir.' ';
+		        if(isset($_POST['bulk_action']) AND is_logged() AND csrf_ok('POST')) {
+		        	$ids = (isset($_POST['bulk_ids']) AND is_array($_POST['bulk_ids'])) ? array_map('intval', $_POST['bulk_ids']) : array();
+		        	$ids = array_filter($ids);
+		        	if(count($ids) > 0) {
+		        		$placeholders = implode(',', array_fill(0, count($ids), '?'));
+		        		if($_POST['bulk_action'] == 'delete') {
+		        			sql('DELETE FROM presse WHERE id IN ('.$placeholders.')', $ids);
+		        			echo '<div class="alert alert-success">'.count($ids).' article(s) supprimé(s).</div>';
+		        		}
+		        		elseif($_POST['bulk_action'] == 'move') {
+		        			sql('UPDATE presse SET id_collection = ? WHERE id IN ('.$placeholders.')', array_merge(array(intval($_POST['bulk_collection'])), $ids));
+		        			echo '<div class="alert alert-success">'.count($ids).' article(s) déplacé(s).</div>';
+		        		}
+		        		elseif($_POST['bulk_action'] == 'categorize') {
+		        			$newcats = array_filter(array_map('trim', explode(' ', (string)$_POST['bulk_category'])));
+		        			if(count($newcats) > 0) {
+		        				foreach($ids as $bid) {article_set_categories($bid, $newcats);}
+		        				echo '<div class="alert alert-success">'.count($ids).' article(s) catégorisé(s).</div>';
+		        			}
+		        		}
+		        	}
+		        }
+		        $base_qs = $_GET;
+		        unset($base_qs['page']);
+		        $base_url = 'index.php?'.http_build_query($base_qs);
+		        $sort_qs = $base_qs; unset($sort_qs['orderby'], $sort_qs['orderdir']);
+		        $sort_url = 'index.php?'.http_build_query($sort_qs);
+		        echo '<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">';
+		        echo '<h1 class="h4 mb-0">Revue de presse <span class="badge text-bg-primary">'.$total_rows.'</span></h1>';
+		        echo '<div class="d-flex gap-2 d-print-none">';
+		        echo '<a class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" href="#filterPanel" role="button" aria-expanded="false" aria-controls="filterPanel"><i class="fa fa-filter" aria-hidden="true"></i> Filtres</a> ';
+		        echo '<button type="button" id="densityToggle" class="btn btn-sm btn-outline-secondary"><i class="fa fa-list" aria-hidden="true"></i> <span id="densityLabel">Vue détaillée</span></button>';
+		        echo '<div class="btn-group btn-sm" role="group" aria-label="Tri">';
+		        foreach(array('date' => 'Date', 'journal' => 'Journal', 'title' => 'Titre') as $col => $label) {
+		        	$active = ($order_col == $col) ? 'btn-secondary' : 'btn-outline-secondary';
+		        	$arrow = ($order_col == $col) ? (($order_dir == 'ASC') ? ' <i class="fa fa-sort-asc" aria-hidden="true"></i>' : ' <i class="fa fa-sort-desc" aria-hidden="true"></i>') : '';
+		        	$next = ($order_col == $col AND $order_dir == 'ASC') ? 'desc' : 'asc';
+		        	echo '<a class="btn btn-sm '.$active.'" href="'.h($sort_url.'&orderby='.$col.'&orderdir='.$next).'">'.$label.$arrow.'</a>';
+		        }
+		        echo '</div>';
+		        echo '<a class="btn btn-sm btn-outline-primary" href="?do=view&sort='.intval(@$_GET['idp']).'"><i class="fa fa-sort" aria-hidden="true"></i> À trier</a>';
+		        echo '<button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="fa fa-print" aria-hidden="true"></i> Imprimer</button>';
+		        echo '</div></div>';
+		        echo '<p class="text-muted small mb-2">Généré le '.date('d/m/Y H:i').' — page '.$current_page.' / '.max(1, $total_pages_display).'</p>';
 		        $query = sql($sql, $params);
 		        $count = 0;
 		        $html_output = '';
@@ -226,12 +342,29 @@ if(isset($_GET['do'])) {
 		        $export = array();
 		        $export[] = array('date', 'year', 'month', 'journal', 'category', 'title', 'content', 'source');
 		       
-		        while($data = $query->fetch()) {
-		        	$html_output .= show_article($data, true);
-		            $export[] = array($data['date'], date('Y', strtotime($data['date'])), date('Y-m', strtotime($data['date'])),$data['journal'], $data['category'], $data['title'], $data['content'], $data['source']);
-		            $raw_txt .= $data['title'].' '.$data['content'].' ';
-		            $count++;
+		        $page_rows = $query->fetchAll();
+		        $dupe_map = array();
+		        if(count($page_rows) > 0) {
+		        	$titles = array();
+		        	foreach($page_rows as $r) {$titles[] = $r['title'];}
+		        	$qs = implode(',', array_fill(0, count($titles), '?'));
+		        	$dupes = sql('SELECT lower(trim(title)) as t, count(*) as n FROM presse WHERE lower(trim(title)) IN ('.$qs.') GROUP BY lower(trim(title)) HAVING count(*) > 1', $titles)->fetchAll();
+		        	foreach($dupes as $d) {$dupe_map[$d['t']] = (int)$d['n'] - 1;}
 		        }
+		        foreach($page_rows as $data) {
+		        	$data['dupe_count'] = (isset($dupe_map[strtolower(trim((string)$data['title']))])) ? $dupe_map[strtolower(trim((string)$data['title']))] : 0;
+		        	$html_output .= show_article($data, true, true);
+		        	$count++;
+		        }
+		        $export_query = sql($export_sql, $params);
+		        foreach($export_query->fetchAll() as $data_export) {
+		            $export[] = array($data_export['date'], date('Y', strtotime($data_export['date'])), date('Y-m', strtotime($data_export['date'])),$data_export['journal'], $data_export['category'], $data_export['title'], $data_export['content'], $data_export['source']);
+		            $raw_txt .= $data_export['title'].' '.$data_export['content'].' ';
+		        }
+		        if($total_rows == 0) {
+		        	$html_output = '<div class="alert alert-info">Aucun article ne correspond à ces critères.</div>';
+		        }
+		        $pagination_html = paginate_links($base_url, $current_page, $per_page, $total_rows);
 		        // STATISTIQUES
 		        $sql_day = 'SELECT strftime(\'%Y-%m-%d\', date) as dates, count(*) as nb FROM presse WHERE '.$period.' '.$journaux.' '.$categories.' '.$search.' '.$collection.' GROUP BY strftime(\'%Y-%m-%d\', date);';
 				$sql_month = 'SELECT strftime(\'%Y-%m\', date) as dates, count(*) as nb FROM presse WHERE '.$period.' '.$journaux.' '.$categories.' '.$search.'  '.$collection.' GROUP BY strftime(\'%Y-%m\', date);';
@@ -244,7 +377,7 @@ if(isset($_GET['do'])) {
 					<table class="table"><tr><th>Dates</th><th>nb</th></tr>';
 					$stats_output .= '<p><code>'.$sql_day.'</code></p>';
 					$query = sql($sql_day, $params);
-					$chart_d = array();
+					$chart_d = array('category' => array());
 					$chart_d['data']['label'] = 'Jour';
 					while($data = $query->fetch()) {
 					 $chart_d['category'][] = $data['dates'];
@@ -261,7 +394,7 @@ if(isset($_GET['do'])) {
 				$stats_output .= '<p><code>'.$sql_month.'</code></p>';
 				
 				$query = sql($sql_month, $params);
-				$chart_d = array();
+				$chart_d = array('category' => array());
 				$chart_d['data']['label'] = 'Mois';
 				while($data = $query->fetch()) {
 					 $chart_d['category'][] = $data['dates'];
@@ -277,7 +410,7 @@ if(isset($_GET['do'])) {
 					<table class="table"><tr><th>Dates</th><th>nb</th></tr>';
 					$stats_output .= '<p><code>'.$sql_year.'</code></p>';
 					$query = sql($sql_year, $params);
-					$chart_d = array();
+					$chart_d = array('category' => array());
 					$chart_d['data']['label'] = 'Année';
 					while($data = $query->fetch()) {
 					 $chart_d['category'][] = $data['dates'];
@@ -293,7 +426,7 @@ if(isset($_GET['do'])) {
 				<table class="table"><tr><th>Catégorie</th><th>nb</th></tr>';
 				$stats_output .= '<p><code>'.$sql_categories.'</code></p>';
 				$query = sql($sql_categories, $params);
-				$chart_cat = array();
+				$chart_cat = array('category' => array());
 				$chart_cat['data']['label'] = 'Catégories';
 				while($data = $query->fetch()) {
 					$chart_cat['category'][] = $data['category'];
@@ -309,7 +442,7 @@ if(isset($_GET['do'])) {
 						<table class="table"><tr><th>Journal</th><th>nb</th></tr>';
 						$stats_output .= '<p><code>'.$sql_journaux.'</code></p>';
 						$query = sql($sql_journaux, $params);
-						$chart_journaux = array();
+						$chart_journaux = array('category' => array());
 						$chart_journaux['data']['label'] = 'Journaux';
 						while($data = $query->fetch()) {
 							$chart_journaux['category'][] = $data['journal'];
@@ -320,17 +453,31 @@ if(isset($_GET['do'])) {
 				$stats_output .= quickchart('pie', $chart_journaux['category'], array($chart_journaux['data']));
 				 
 				 if(isset($_GET['submit_file'])) {
-		            $filename = date('Y-m-d-His', time());
+		            $slug_parts = array();
+		            if(intval(@$_GET['collection']) > 0) {
+		            	$cn = sql('SELECT name FROM collections WHERE id = ?', array(intval($_GET['collection'])))->fetch();
+		            	if($cn) {$slug_parts[] = no_accents($cn['name']);}
+		            }
+		            if(!empty($_GET['date_begin']) AND $_GET['date_begin'] != '1900-01-01') {$slug_parts[] = $_GET['date_begin'];}
+		            if(!empty($_GET['date_end']) AND $_GET['date_end'] != date('Y-m-d')) {$slug_parts[] = $_GET['date_end'];}
+		            foreach((array)@$_GET['category'] as $c) {$slug_parts[] = no_accents($c);}
+		            if(!empty($_GET['search'])) {$slug_parts[] = no_accents($_GET['search']);}
+		            $slug = implode('-', $slug_parts);
+		            $slug = preg_replace('/[^a-z0-9-]+/', '-', strtolower($slug));
+		            $slug = trim($slug, '-');
+		            $slug = substr($slug, 0, 60);
+		            $export_name = 'presse'.(($slug !== '') ? '-'.$slug : '').'-'.date('Y-m-d-His');
+		            $filename = $export_name;
 		            mkdir('data/export/'.$filename);
 		            file_put_contents('data/export/'.$filename.'/query.txt', $sql);
 		            exportcsv($export, 'data/export/'.$filename.'/presse.csv');
 		            exportiramuteq($export, 'data/export/'.$filename.'/presse_iramuteq.txt');
 		            file_put_contents('data/export/'.$filename.'/presse_raw.txt', $raw_txt);
-		            ZipDir('data/export/'.$filename.'/export-'.$filename.'.zip', 'data/export/'.$filename);
+		            ZipDir('data/export/'.$filename.'/'.(($export_name) ?? 'export-'.$filename).'.zip', 'data/export/'.$filename);
 		           //redirect('data/export/'.$filename.'.zip');
 		            
 		            echo '
-		            <a href="api.php?do=export-file&dir='.$filename.'&file=export-'.$filename.'.zip&token='.h($_SESSION['token']).'" class="btn btn-primary"><i class="fa fa-file-archive-o" aria-hidden="true"></i> Archive (zip)</a> 
+		            <a href="api.php?do=export-file&dir='.$filename.'&file='.$filename.'.zip&token='.h($_SESSION['token']).'" class="btn btn-primary"><i class="fa fa-file-archive-o" aria-hidden="true"></i> Archive (zip)</a> 
 		            <a href="api.php?do=export-file&dir='.$filename.'&file=query.txt&token='.h($_SESSION['token']).'" class="btn btn-primary"><i class="fa fa-database" aria-hidden="true"></i> Requête SQL</a> 
 		            <a href="api.php?do=export-file&dir='.$filename.'&file=presse_iramuteq.txt&token='.h($_SESSION['token']).'" class="btn btn-primary"><i class="fa fa-download" aria-hidden="true"></i> Fichier Iramuteq</a> 
 		            <a href="api.php?do=export-file&dir='.$filename.'&file=presse.csv&token='.h($_SESSION['token']).'" class="btn btn-primary"><i class="fa fa-download" aria-hidden="true"></i> Fichier CSV</a> 
@@ -347,7 +494,11 @@ if(isset($_GET['do'])) {
 				  </li>
 				</ul>
 				<div class="tab-content" id="myTabContent">
-				  <div class="tab-pane fade show active" id="html-tab-pane" role="tabpanel" aria-labelledby="html-tab" tabindex="0">'.$count.' résultat(s)'.$html_output.'</div>
+				  <div class="tab-pane fade show active" id="html-tab-pane" role="tabpanel" aria-labelledby="html-tab" tabindex="0">'
+				  .((is_logged()) ? '<form method="post" action="index.php?do=view" class="d-print-none mb-3">'.csrf_field().'<div class="input-group"><span class="input-group-text">Tout <input type="checkbox" onclick="document.querySelectorAll(\'input[name^=bulk_ids]\').forEach(c => c.checked = this.checked)"/></span><select name="bulk_action" class="form-select"><option value="categorize">Catégoriser</option><option value="move">Déplacer</option><option value="delete">Supprimer</option></select><input type="text" name="bulk_category" placeholder="catégories (espaces)" class="form-control"/><select name="bulk_collection" class="form-select">' : '')
+				  .((is_logged()) ? implode('', array_map(function($c) {return '<option value="'.intval($c['id']).'">'.h($c['name']).'</option>';}, sql('SELECT id, name FROM collections ORDER BY name', array())->fetchAll())) : '')
+				  .((is_logged()) ? '</select><button type="submit" class="btn btn-primary">Appliquer à la sélection cochée</button></div></form>' : '')
+				  .$pagination_html.$html_output.((is_logged()) ? '</form>' : '').$pagination_html.'</div>
 				  <div class="tab-pane fade" id="stats-tab-pane" role="tabpanel" aria-labelledby="stats-tab" tabindex="0">'.$stats_output.'</div>
 				</div>';
 		        }
@@ -411,6 +562,11 @@ if(isset($_GET['do'])) {
 	        }
 
 	        if (isset($_POST['content']) AND csrf_ok('POST')) {
+	            $dupe = sql('SELECT id, title FROM presse WHERE id != ? AND lower(trim(title)) = lower(trim(?)) LIMIT 1', array(intval($_POST['id']), $_POST['title']))->fetch();
+	            if($dupe AND @$_POST['force_save'] != 'yes') {
+	                echo '<div class="alert alert-warning">Un article au titre identique existe déjà (#'.intval($dupe['id']).' — '.h($dupe['title']).'). <a class="btn btn-sm btn-outline-warning" href="index.php?do=view&article='.intval($dupe['id']).'">Le voir</a></div>';
+	            }
+	            if(!$dupe OR @$_POST['force_save'] == 'yes') {
 	            echo "Ajout dans la base de données";
 	            $new_id = intval($_POST['id']);
 	            if ($new_id == 0) {
@@ -425,6 +581,7 @@ if(isset($_GET['do'])) {
 	            }
 	            article_set_categories($new_id, $cats);
 	            redirect('index.php?do=view&article='.$new_id);
+	            }
 	        }
 	    echo '<form method="post" action="?do=add" class="d-print-none">
 	       '.csrf_field().'
@@ -436,7 +593,7 @@ if(isset($_GET['do'])) {
 	        <label>Collection</label>
 	        <select class="form-select" name="collection">';
 	            //$id_collection = (isset($_GET['idp'])) ? $_GET['idp'] : 0;
-	            $query = $db->query('SELECT * FROM collections ORDER BY id');
+	            $query = sql('SELECT c.*, (SELECT COUNT(*) FROM presse p WHERE p.id_collection = c.id AND p.category = ?) as a_trier FROM collections c ORDER BY c.id', array('à_trier'));
 	            while($data = $query->fetch()) {
 			        $selected = ((int)$data['id'] == (int)$id_collection) ? 'selected' : '';
 			      	echo '<option value="'.$data['id'].'" '.$selected.'>'.$data['name'].'</option>';
@@ -505,9 +662,9 @@ if(isset($_GET['do'])) {
 	        <label for="category">Catégories</label>
 	        <select class="form-select" multiple aria-label="multiple select" name="category[]" style="height:50em">';
 		                    $category = (isset($_POST['category'])) ? $_POST['category'] : array();
-		                    foreach(categories_list(isset($_GET['idp']) ? intval($_GET['idp']) : null) as $cat) {
+		                    foreach(categories_list((isset($_GET['idp']) AND intval($_GET['idp']) > 0) ? intval($_GET['idp']) : null) as $cat) {
 			            	$selected = (in_array($cat, $category)) ? 'selected' : '';
-			            	echo '<option value="'+Q+'.h($cat)+'+Q+'" '+Q+'.$selected.'+Q+'>'+Q+'.h($cat)+'+Q+'</option>';
+			            	echo '<option value="'.h($cat).'" '.$selected.'>'.h($cat).'</option>';
 			            }
 		                
 		    echo ' </select>
@@ -540,6 +697,45 @@ if(isset($_GET['do'])) {
       			sql('DELETE FROM presse WHERE id NOT IN (SELECT MAX(id) FROM presse GROUP BY title, id_collection) AND id_collection=?', array(intval($_POST['id_collection'])));
       			redirect('index.php?do=tools');
       		}
+
+        echo '<h1>Purger les exports</h1>';
+        $export_dirs = glob('data/export/*', GLOB_ONLYDIR);
+        $export_count = ($export_dirs === false) ? 0 : count($export_dirs);
+        echo '<p>'.$export_count.' dossier(s) d\'export stocké(s) sur le serveur.</p>';
+        echo '<form method="post" action="?do=tools" onsubmit="return confirm(\'Supprimer les exports de plus de 30 jours ?\');">'.csrf_field().'<button type="submit" name="purge_exports" value="yes" class="btn btn-danger"><i class="fa fa-trash" aria-hidden="true"></i> Purger les exports de plus de 30 jours</button></form>';
+        if(isset($_POST['purge_exports']) AND csrf_ok('POST')) {
+        	$purged = 0;
+        	foreach((array)$export_dirs as $dir) {
+        		if(is_dir($dir) AND filemtime($dir) < strtotime('-30 days')) {
+        			foreach(glob($dir.'/*') as $f) {if(is_file($f)) {unlink($f);}}
+        			if(rmdir($dir)) {$purged++;}
+        		}
+        	}
+        	echo '<div class="alert alert-success">'.$purged.' dossier(s) d\'export purgé(s).</div>';
+        }
+
+        echo '<h1>Fusionner deux collections</h1>';
+        echo '<form method="post" action="?do=tools" onsubmit="return confirm(\'Fusionner les collections ? Les articles seront déplacés et la collection source supprimée.\');">'.csrf_field();
+        echo '<label>Collections à fusionner</label><select class="form-select" name="merge_from">';
+        $merge_cols = sql('SELECT id, name FROM collections ORDER BY name', array())->fetchAll();
+        foreach($merge_cols as $mc) {echo '<option value="'.intval($mc['id']).'">'.h($mc['name']).'</option>';}
+        echo '</select>';
+        echo '<label>Dans la collection</label><select class="form-select" name="merge_into">';
+        foreach($merge_cols as $mc) {echo '<option value="'.intval($mc['id']).'">'.h($mc['name']).'</option>';}
+        echo '</select>';
+        echo '<button type="submit" name="merge_collections" value="yes" class="btn btn-primary"><i class="fa fa-compress" aria-hidden="true"></i> Fusionner</button></form>';
+        if(isset($_POST['merge_collections']) AND csrf_ok('POST')) {
+        	$from = intval($_POST['merge_from']);
+        	$into = intval($_POST['merge_into']);
+        	if($from > 0 AND $into > 0 AND $from != $into) {
+        		sql('UPDATE presse SET id_collection = ? WHERE id_collection = ?', array($into, $from));
+        		sql('DELETE FROM collections WHERE id = ?', array($from));
+        		echo '<div class="alert alert-success">Collections fusionnées.</div>';
+        	}
+        	else {
+        		echo '<div class="alert alert-warning">Impossible : choisissez deux collections différentes.</div>';
+        	}
+        }
         break;
         case 'import':
         	if(!is_logged()) {redirect('index.php?do=login');}
@@ -602,7 +798,7 @@ if(isset($_GET['do'])) {
 			echo'<form method="post" action="?do=import" enctype="multipart/form-data" class="d-print-none">
 			    <label>Collection</label>
 			    <select class="form-select" name="collection">';
-			        $id_collection = (isset($_GET['idp'])) ? $_GET['idp'] : 0;
+			        $id_collection = (isset($_GET['idp'])) ? intval($_GET['idp']) : 0;
 			        $query = $db->query('SELECT * FROM collections ORDER BY id');
 			        while($data = $query->fetch()) {
 			        	$selected = ((int)$data['id'] == (int)$id_collection) ? 'selected' : '';
@@ -720,7 +916,20 @@ else {
 }
 ?>
 </main>
-<footer><a href="https://framagit.org/justinmponcet/pressdb">Code source</a> - Version alpha</footer>
+<footer class="mt-4 py-3 border-top d-print-none">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 small text-muted">
+        <span><i class="fa fa-database" aria-hidden="true"></i>
+<?php
+$footer_stats = sql('SELECT (SELECT count(*) FROM presse) as articles, (SELECT count(*) FROM collections) as collections', array())->fetch();
+echo (int)$footer_stats['articles'].' article(s) dans '.(int)$footer_stats['collections'].' collection(s)';
+?>
+        </span>
+        <span>
+            <a class="link-secondary" href="https://framagit.org/justinmponcet/pressdb"><i class="fa fa-code" aria-hidden="true"></i> Code source</a>
+            · PressDB <em>alpha</em>
+        </span>
+    </div>
+</footer>
 <script>
 document.querySelectorAll('a[data-ajax]').forEach(link => {
     link.addEventListener('click', function(e) {
@@ -731,8 +940,14 @@ document.querySelectorAll('a[data-ajax]').forEach(link => {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    console.log('Action effectuée avec succès !');
-                    location.reload();
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'toast-container position-fixed top-0 end-0 p-3';
+                    wrapper.innerHTML = '<div class="toast align-items-center text-bg-success border-0 show" role="alert"><div class="d-flex"><div class="toast-body">' + (data.message || 'Action effectuée') + '</div></div></div>';
+                    document.body.appendChild(wrapper);
+                    setTimeout(() => wrapper.remove(), 3000);
+                    const art = link.closest('article');
+                    if (art) {art.remove();}
+                    setTimeout(() => location.reload(), 1200);
                 } else {
                     alert('Erreur : ' + (data.message || 'Action impossible.'));
                 }
@@ -744,5 +959,55 @@ document.querySelectorAll('a[data-ajax]').forEach(link => {
     });
 });
 </script>
+<script>
+window.pressdbCharts = <?= json_encode($chart_configs ?: array()) ?>;
+window.pressdbChartInstances = window.pressdbChartInstances || {};
+window.pressdbInitCharts = function() {
+    if(typeof Chart === 'undefined') {return false;}
+    Object.keys(window.pressdbCharts).forEach(function(id) {
+        const el = document.getElementById(id);
+        if(!el) {return;}
+        if(window.pressdbChartInstances[id]) {
+            try {window.pressdbChartInstances[id].resize();} catch(e) {}
+            return;
+        }
+        const pane = el.closest('.tab-pane');
+        if(pane && !pane.classList.contains('active')) {return;}
+        window.pressdbChartInstances[id] = new Chart(el, window.pressdbCharts[id]);
+    });
+    return true;
+};
+(function waitChart() {
+    if(window.pressdbInitCharts && window.pressdbInitCharts()) {return;}
+    setTimeout(waitChart, 150);
+})();
+document.addEventListener('shown.bs.tab', function(e) {
+    if(window.pressdbInitCharts) {setTimeout(window.pressdbInitCharts, 50);}
+});
+</script>
+<script>
+(function() {
+    const KEY = 'pressdb-density';
+    const apply = function(mode) {
+        document.body.classList.toggle('density-compact', mode === 'compact');
+        document.querySelectorAll('details').forEach(d => {d.open = (mode !== 'compact');});
+        const label = document.getElementById('densityLabel');
+        if(label) {label.textContent = (mode === 'compact') ? 'Vue compacte' : 'Vue détaillée';}
+        localStorage.setItem(KEY, mode);
+    };
+    const saved = localStorage.getItem(KEY) || 'full';
+    if(saved === 'compact') {apply('compact');}
+    const btn = document.getElementById('densityToggle');
+    if(btn) {btn.addEventListener('click', function() {
+        apply(document.body.classList.contains('density-compact') ? 'full' : 'compact');
+    });}
+})();
+</script>
+<style>
+@media screen {
+    body.density-compact article .article-compact {display: none;}
+    body.density-compact article details {display: none;}
+}
+</style>
 </body>
 </html>
