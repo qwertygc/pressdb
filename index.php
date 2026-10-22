@@ -267,6 +267,7 @@ echo '</form></div></div>';
 		        $current_page = (isset($_GET['page'])) ? max(1, intval($_GET['page'])) : 1;
 		        $sql_count = 'SELECT count(*) as total FROM presse WHERE '.$period.' '.$journaux.' '.$categories.' '.$search.' '.$collection;
 		        $total_rows = (int)sql($sql_count, $params)->fetch()['total'];
+		        $total_pages_display = (int)ceil($total_rows / $per_page);
 		        $offset = ($current_page - 1) * $per_page;
 		        $sql = 'SELECT * FROM presse WHERE '.$period.' '.$journaux.' '.$categories.' '.$search.' '.$collection.' ORDER BY '.$order_col.' '.$order_dir.' LIMIT '.$per_page.' OFFSET '.$offset.' ';
 		        $export_sql = 'SELECT * FROM presse WHERE '.$period.' '.$journaux.' '.$categories.' '.$search.' '.$collection.' ORDER BY '.$order_col.' '.$order_dir.' ';
@@ -292,6 +293,11 @@ echo '</form></div></div>';
 		        		}
 		        	}
 		        }
+		        $base_qs = $_GET;
+		        unset($base_qs['page']);
+		        $base_url = 'index.php?'.http_build_query($base_qs);
+		        $sort_qs = $base_qs; unset($sort_qs['orderby'], $sort_qs['orderdir']);
+		        $sort_url = 'index.php?'.http_build_query($sort_qs);
 		        echo '<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">';
 		        echo '<h1 class="h4 mb-0">Revue de presse <span class="badge text-bg-primary">'.$total_rows.'</span></h1>';
 		        echo '<div class="d-flex gap-2 d-print-none">';
@@ -311,11 +317,6 @@ echo '</form></div></div>';
 		        echo '<p class="text-muted small mb-2">Généré le '.date('d/m/Y H:i').' — page '.$current_page.' / '.max(1, $total_pages_display).'</p>';
 		        $query = sql($sql, $params);
 		        $count = 0;
-		        $base_qs = $_GET;
-		        unset($base_qs['page']);
-		        $base_url = 'index.php?'.http_build_query($base_qs);
-		        $sort_qs = $base_qs; unset($sort_qs['orderby'], $sort_qs['orderdir']);
-		        $sort_url = 'index.php?'.http_build_query($sort_qs);
 		        $html_output = '';
 		        $raw_txt = '';
 		        $export = array();
@@ -344,7 +345,6 @@ echo '</form></div></div>';
 		        	$html_output = '<div class="alert alert-info">Aucun article ne correspond à ces critères.</div>';
 		        }
 		        $pagination_html = paginate_links($base_url, $current_page, $per_page, $total_rows);
-		        $total_pages_display = (int)ceil($total_rows / $per_page);
 		        // STATISTIQUES
 		        $sql_day = 'SELECT strftime(\'%Y-%m-%d\', date) as dates, count(*) as nb FROM presse WHERE '.$period.' '.$journaux.' '.$categories.' '.$search.' '.$collection.' GROUP BY strftime(\'%Y-%m-%d\', date);';
 				$sql_month = 'SELECT strftime(\'%Y-%m\', date) as dates, count(*) as nb FROM presse WHERE '.$period.' '.$journaux.' '.$categories.' '.$search.'  '.$collection.' GROUP BY strftime(\'%Y-%m\', date);';
