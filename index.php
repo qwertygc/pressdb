@@ -898,6 +898,32 @@ document.querySelectorAll('a[data-ajax]').forEach(link => {
 });
 </script>
 <script>
+window.pressdbCharts = <?= json_encode($chart_configs ?: array()) ?>;
+window.pressdbChartInstances = window.pressdbChartInstances || {};
+window.pressdbInitCharts = function() {
+    if(typeof Chart === 'undefined') {return false;}
+    Object.keys(window.pressdbCharts).forEach(function(id) {
+        const el = document.getElementById(id);
+        if(!el) {return;}
+        if(window.pressdbChartInstances[id]) {
+            try {window.pressdbChartInstances[id].resize();} catch(e) {}
+            return;
+        }
+        const pane = el.closest('.tab-pane');
+        if(pane && !pane.classList.contains('active')) {return;}
+        window.pressdbChartInstances[id] = new Chart(el, window.pressdbCharts[id]);
+    });
+    return true;
+};
+(function waitChart() {
+    if(window.pressdbInitCharts && window.pressdbInitCharts()) {return;}
+    setTimeout(waitChart, 150);
+})();
+document.addEventListener('shown.bs.tab', function(e) {
+    if(window.pressdbInitCharts) {setTimeout(window.pressdbInitCharts, 50);}
+});
+</script>
+<script>
 (function() {
     const KEY = 'pressdb-density';
     const apply = function(mode) {

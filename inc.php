@@ -133,12 +133,15 @@ function europresse2standardtime($str) {
 		);
 }
 
+$chart_configs = array();
 function chart_counter() {
     static $n = 0;
     $n++;
     return 'chart'.$n;
 }
 function quickchart($type, $labels=array('Q1', 'Q2', 'Q3', 'Q4'), $ds=array(array('label'=>'Dogs', 'data'=>array(1, 2, 3, 4)))) {
+    global $chart_configs;
+    if(!isset($chart_configs) OR !is_array($chart_configs)) {$chart_configs = array();}
     $config = [
         'type' => $type,
         'data' => [
@@ -147,7 +150,8 @@ function quickchart($type, $labels=array('Q1', 'Q2', 'Q3', 'Q4'), $ds=array(arra
         ]
     ];
     $id = chart_counter();
-    return '<canvas id="'.$id.'"></canvas><script>new Chart(document.getElementById("'.$id.'"), '.json_encode($config).');</script>';
+    $chart_configs[$id] = $config;
+    return '<canvas id="'.$id.'"></canvas>';
 }
 function beautiful_url($url) {
 	if(filter_var($url, FILTER_VALIDATE_URL)) {
