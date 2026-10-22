@@ -145,8 +145,8 @@ function quickchart($type, $labels=array('Q1', 'Q2', 'Q3', 'Q4'), $ds=array(arra
     $config = [
         'type' => $type,
         'data' => [
-            'labels' => $labels,
-            'datasets' => $ds
+            'labels' => (is_array($labels) ? $labels : array()),
+            'datasets' => (is_array($ds) ? $ds : array(array('label' => 'Occurrences', 'data' => array())))
         ]
     ];
     $id = chart_counter();

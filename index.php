@@ -357,7 +357,7 @@ echo '</form></div></div>';
 					<table class="table"><tr><th>Dates</th><th>nb</th></tr>';
 					$stats_output .= '<p><code>'.$sql_day.'</code></p>';
 					$query = sql($sql_day, $params);
-					$chart_d = array();
+					$chart_d = array('category' => array());
 					$chart_d['data']['label'] = 'Jour';
 					while($data = $query->fetch()) {
 					 $chart_d['category'][] = $data['dates'];
@@ -374,7 +374,7 @@ echo '</form></div></div>';
 				$stats_output .= '<p><code>'.$sql_month.'</code></p>';
 				
 				$query = sql($sql_month, $params);
-				$chart_d = array();
+				$chart_d = array('category' => array());
 				$chart_d['data']['label'] = 'Mois';
 				while($data = $query->fetch()) {
 					 $chart_d['category'][] = $data['dates'];
@@ -390,7 +390,7 @@ echo '</form></div></div>';
 					<table class="table"><tr><th>Dates</th><th>nb</th></tr>';
 					$stats_output .= '<p><code>'.$sql_year.'</code></p>';
 					$query = sql($sql_year, $params);
-					$chart_d = array();
+					$chart_d = array('category' => array());
 					$chart_d['data']['label'] = 'Année';
 					while($data = $query->fetch()) {
 					 $chart_d['category'][] = $data['dates'];
@@ -406,7 +406,7 @@ echo '</form></div></div>';
 				<table class="table"><tr><th>Catégorie</th><th>nb</th></tr>';
 				$stats_output .= '<p><code>'.$sql_categories.'</code></p>';
 				$query = sql($sql_categories, $params);
-				$chart_cat = array();
+				$chart_cat = array('category' => array());
 				$chart_cat['data']['label'] = 'Catégories';
 				while($data = $query->fetch()) {
 					$chart_cat['category'][] = $data['category'];
@@ -422,7 +422,7 @@ echo '</form></div></div>';
 						<table class="table"><tr><th>Journal</th><th>nb</th></tr>';
 						$stats_output .= '<p><code>'.$sql_journaux.'</code></p>';
 						$query = sql($sql_journaux, $params);
-						$chart_journaux = array();
+						$chart_journaux = array('category' => array());
 						$chart_journaux['data']['label'] = 'Journaux';
 						while($data = $query->fetch()) {
 							$chart_journaux['category'][] = $data['journal'];
