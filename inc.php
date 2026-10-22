@@ -197,9 +197,7 @@ function badge($text) {
 					<i class="fa fa-tags" aria-hidden="true"></i> Assigner une catégorie
 				  </button>
 				  <ul class="dropdown-menu">';
-					 $query = sql('SELECT DISTINCT LOWER(TRIM(category)) as category FROM presse '.$filter_cat.' ORDER BY LOWER(TRIM(category))');
-					 $data = $query->fetchAll(PDO::FETCH_COLUMN);
-					 foreach(tags($data) as $cat) {
+					 foreach(categories_list(isset($_GET['idp']) ? intval($_GET['idp']) : null) as $cat) {
 							$tags .= '<li><a class="dropdown-item" href="api.php?do=update-category&id='.intval($array['id']).'&category='.urlencode($cat).'&token='.h($_SESSION['token']).'&idp='.intval(@$_GET['idp']).'" data-ajax="true">'.h($cat).'</a></li>';
 					 }
 					$tags .='</ul></div>';
@@ -245,11 +243,79 @@ CREATE TABLE "users" (
 	"password"	TEXT,
 	"permit"	INTEGER
 );');
+		$db->query('
+CREATE TABLE "categories" (
+	"id"	INTEGER PRIMARY KEY AUTOINCREMENT,
+	"name"	TEXT UNIQUE
+);');
+		$db->query('
+CREATE TABLE "presse_categories" (
+	"id_presse"	INTEGER,
+	"id_category"	INTEGER,
+	UNIQUE(id_presse, id_category)
+);');
 
 	sql('INSERT INTO users (login, password, permit) VALUES (?, ?, ?)', array('admin', password_hash('admin', PASSWORD_DEFAULT), 1));
 }
 else {
     $db = new PDO('sqlite:data/data.db');
+}
+
+function category_id($name) {
+	global $db;
+	$name = trim((string)$name);
+	if($name === '') {return 0;}
+	$exists = sql('SELECT id FROM categories WHERE name = ?', array($name))->fetch();
+	if($exists) {return (int)$exists['id'];}
+	sql('INSERT INTO categories (name) VALUES (?)', array($name));
+	return (int)$db->lastInsertId();
+}
+function article_set_categories($id_presse, $names) {
+	global $db;
+	if(!is_array($names)) {$names = array_filter(array_map('trim', explode(' ', (string)$names)));}
+	$id_presse = (int)$id_presse;
+	sql('DELETE FROM presse_categories WHERE id_presse = ?', array($id_presse));
+	foreach($names as $name) {
+		$name = trim((string)$name);
+		if($name === '') {continue;}
+		$id_cat = category_id($name);
+		if($id_cat > 0) {sql('INSERT OR IGNORE INTO presse_categories (id_presse, id_category) VALUES (?, ?)', array($id_presse, $id_cat));}
+	}
+	$sql = 'UPDATE presse SET category = ? WHERE id = ?';
+	$category_text = implode(' ', array_filter(array_map('trim', $names), function($n){return $n !== '';}));
+	sql($sql, array($category_text, $id_presse));
+}
+function article_categories($id_presse) {
+	$id_presse = (int)$id_presse;
+	if($id_presse <= 0) {return array();}
+	return sql('SELECT c.name FROM presse_categories pc JOIN categories c ON c.id = pc.id_category WHERE pc.id_presse = ? ORDER BY c.name', array($id_presse))->fetchAll(PDO::FETCH_COLUMN);
+}
+function categories_list($id_collection = null) {
+	if($id_collection !== null) {
+		return sql('SELECT DISTINCT c.name FROM categories c JOIN presse_categories pc ON pc.id_category = c.id JOIN presse p ON p.id = pc.id_presse WHERE p.id_collection = ? ORDER BY c.name', array((int)$id_collection))->fetchAll(PDO::FETCH_COLUMN);
+	}
+	return sql('SELECT name FROM categories ORDER BY name', array())->fetchAll(PDO::FETCH_COLUMN);
+}
+function migrate_categories() {
+	$data = sql('SELECT id, category FROM presse WHERE category IS NOT NULL AND TRIM(category) != ""', array())->fetchAll();
+	foreach($data as $row) {
+		article_set_categories($row['id'], $row['category']);
+	}
+}
+$cat_tables = sql("SELECT count(*) as n FROM sqlite_master WHERE type='table' AND name IN ('categories', 'presse_categories')", array())->fetch();
+if((int)$cat_tables['n'] < 2) {
+	$db->query('
+CREATE TABLE IF NOT EXISTS "categories" (
+	"id"	INTEGER PRIMARY KEY AUTOINCREMENT,
+	"name"	TEXT UNIQUE
+);');
+	$db->query('
+CREATE TABLE IF NOT EXISTS "presse_categories" (
+	"id_presse"	INTEGER,
+	"id_category"	INTEGER,
+	UNIQUE(id_presse, id_category)
+);');
+	migrate_categories();
 }
 
 if(!file_exists('data/.htaccess')) {
