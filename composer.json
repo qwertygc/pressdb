@@ -10,6 +10,15 @@
     "config": {
         "allow-plugins": {
             "php-http/discovery": true
+        },
+        "policy": {
+            "advisories": {
+                "ignore-id": {
+                    "PKSA-px1b-j2dd-31r6": {
+                        "reason": "SSRF flaw in graby's own SSRF-protection plugin; no fixed release exists (all versions <=3.0.1 affected). pressdb applies its own url_allowed() SSRF allowlist before graby fetches any URL, mitigating the issue."
+                    }
+                }
+            }
         }
     }
 }
