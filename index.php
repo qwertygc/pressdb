@@ -615,7 +615,7 @@ echo '</form></div></div>';
 		                    $category = (isset($_POST['category'])) ? $_POST['category'] : array();
 		                    foreach(categories_list((isset($_GET['idp']) AND intval($_GET['idp']) > 0) ? intval($_GET['idp']) : null) as $cat) {
 			            	$selected = (in_array($cat, $category)) ? 'selected' : '';
-			            	echo '<option value="'+Q+'.h($cat)+'+Q+'" '+Q+'.$selected.'+Q+'>'+Q+'.h($cat)+'+Q+'</option>';
+			            	echo '<option value="'.h($cat).'" '.$selected.'>'.h($cat).'</option>';
 			            }
 		                
 		    echo ' </select>
