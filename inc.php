@@ -275,6 +275,12 @@ CREATE TABLE "presse_categories" (
 	"id_category"	INTEGER,
 	UNIQUE(id_presse, id_category)
 );');
+		$db->query('
+CREATE TABLE "users_collections" (
+	"id_user"	INTEGER,
+	"id_collection"	INTEGER,
+	UNIQUE(id_user, id_collection)
+);');
 
 	sql('INSERT INTO users (login, password, permit) VALUES (?, ?, ?)', array('admin', password_hash('admin', PASSWORD_DEFAULT), 1));
 }
@@ -312,7 +318,11 @@ function article_categories($id_presse) {
 	return sql('SELECT c.name FROM presse_categories pc JOIN categories c ON c.id = pc.id_category WHERE pc.id_presse = ? ORDER BY c.name', array($id_presse))->fetchAll(PDO::FETCH_COLUMN);
 }
 function public_collections_clause($alias) {
-	if(is_logged()) {return '';}
+	if(is_admin()) {return '';}
+	if(is_logged()) {
+		if(empty($_SESSION['user_id'])) {return ' AND ('.$alias.'.public = 1)';}
+		return ' AND ('.$alias.'.public = 1 OR '.$alias.'.id IN (SELECT uc.id_collection FROM users_collections uc WHERE uc.id_user = '.(int)$_SESSION['user_id'].'))';
+	}
 	return ' AND ('.$alias.'.public = 1)';
 }
 function categories_list($id_collection = null) {
@@ -326,6 +336,15 @@ function migrate_categories() {
 	foreach($data as $row) {
 		article_set_categories($row['id'], $row['category']);
 	}
+}
+$uc_table = sql("SELECT count(*) as n FROM sqlite_master WHERE type='table' AND name = 'users_collections'", array())->fetch();
+if((int)$uc_table['n'] === 0) {
+	$db->query('
+CREATE TABLE IF NOT EXISTS "users_collections" (
+	"id_user"	INTEGER,
+	"id_collection"	INTEGER,
+	UNIQUE(id_user, id_collection)
+);');
 }
 $col_public = sql("SELECT count(*) as n FROM pragma_table_info('collections') WHERE name = 'public'", array())->fetch();
 if((int)$col_public['n'] === 0) {
